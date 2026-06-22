@@ -13,8 +13,9 @@
     }
   },
   "scripts": {
-    "dev": "node ../../scripts/with-env.mjs tsx watch src/index.ts",
-    "start": "node ../../scripts/with-env.mjs tsx src/index.ts",
+    "with-env": "dotenv -e ../../.env --",
+    "dev": "pnpm with-env tsx watch src/index.ts",
+    "start": "pnpm with-env tsx src/index.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
