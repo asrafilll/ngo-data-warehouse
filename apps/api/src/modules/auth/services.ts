@@ -1,14 +1,10 @@
+import { authConfig } from "@repo/config";
 import type { Context } from "hono";
 import { deleteCookie, getCookie, setCookie } from "hono/cookie";
 import { sign, verify } from "hono/jwt";
 import { type Role, type User, prisma } from "../../utils/prisma";
 import { hashPassword, verifyPassword } from "./password";
 import type { AuthPayload } from "./types";
-
-const authCookieName = "auth_token";
-const authMaxAgeSeconds = 60 * 60 * 24 * 7;
-const authSecret = process.env.AUTH_SECRET ?? "dev-change-me";
-const authCookieSecure = process.env.AUTH_COOKIE_SECURE === "true";
 
 export async function authenticateUser(email: string, password: string) {
   const user = await prisma.user.findUnique({ where: { email } });
@@ -36,14 +32,14 @@ export async function createUserAccount(input: {
 }
 
 export async function getCurrentUser(c: Context) {
-  const token = getCookie(c, authCookieName);
+  const token = getCookie(c, authConfig.cookieName);
 
   if (!token) {
     return null;
   }
 
   try {
-    const payload = (await verify(token, authSecret, "HS256")) as AuthPayload;
+    const payload = (await verify(token, authConfig.secret, "HS256")) as AuthPayload;
 
     if (!payload.sub) {
       return null;
@@ -72,23 +68,23 @@ export async function setAuthCookie(c: Context, user: User) {
       sub: user.id,
       role: user.role,
       iat: now,
-      exp: now + authMaxAgeSeconds,
+      exp: now + authConfig.maxAgeSeconds,
     },
-    authSecret,
+    authConfig.secret,
     "HS256",
   );
 
-  setCookie(c, authCookieName, token, {
+  setCookie(c, authConfig.cookieName, token, {
     httpOnly: true,
     sameSite: "Lax",
-    secure: authCookieSecure,
+    secure: authConfig.cookieSecure,
     path: "/",
-    maxAge: authMaxAgeSeconds,
+    maxAge: authConfig.maxAgeSeconds,
   });
 }
 
 export function clearAuthCookie(c: Context) {
-  deleteCookie(c, authCookieName, {
+  deleteCookie(c, authConfig.cookieName, {
     path: "/",
   });
 }

@@ -1,9 +1,8 @@
+import { redisConfig } from "@repo/config";
 import { Queue, QueueEvents, Worker, type ConnectionOptions } from "bullmq";
 
-export const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
-
 export const connection: ConnectionOptions = {
-  url: redisUrl,
+  url: redisConfig.url,
   maxRetriesPerRequest: null,
 };
 
