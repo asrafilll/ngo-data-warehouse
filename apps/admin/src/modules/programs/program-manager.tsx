@@ -38,6 +38,7 @@ import { Textarea } from "@repo/ui/components/textarea";
 import { cn } from "@repo/ui/lib/utils";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { TablePagination, paginate } from "../../components/pagination";
 import { type Program, type ProgramType, programTypeLabels, seedPrograms } from "./data";
 
 type Draft = {
@@ -56,17 +57,25 @@ const emptyDraft: Draft = {
   defaultNominal: "",
 };
 
-export function ProgramManager() {
+export function ProgramManager({
+  page,
+  onPageChange,
+}: {
+  page: number;
+  onPageChange: (next: number) => void;
+}) {
   const [programs, setPrograms] = useState<Program[]>(seedPrograms);
   const [typeFilter, setTypeFilter] = useState<ProgramType | "all">("all");
   const [editing, setEditing] = useState<Program | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Program | null>(null);
+  const resetPage = () => onPageChange(1);
 
   const rows = useMemo(
     () => (typeFilter === "all" ? programs : programs.filter((p) => p.type === typeFilter)),
     [programs, typeFilter],
   );
+  const paged = paginate(rows, page);
 
   const openAdd = () => {
     setEditing(null);
@@ -110,6 +119,7 @@ export function ProgramManager() {
         ...prev,
       ]);
       toast.success(`Program "${draft.name}" ditambahkan.`);
+      resetPage();
     }
     setDialogOpen(false);
   };
@@ -139,7 +149,10 @@ export function ProgramManager() {
       <div className="rounded-xl border bg-background">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b p-4">
           <NativeSelect
-            onChange={(e) => setTypeFilter(e.target.value as ProgramType | "all")}
+            onChange={(e) => {
+              setTypeFilter(e.target.value as ProgramType | "all");
+              resetPage();
+            }}
             size="sm"
             value={typeFilter}
           >
@@ -147,9 +160,6 @@ export function ProgramManager() {
             <NativeSelectOption value="insidental">Insidental</NativeSelectOption>
             <NativeSelectOption value="rutin">Rutin bulanan</NativeSelectOption>
           </NativeSelect>
-          <span className="text-muted-foreground text-xs">
-            <span className="font-medium text-foreground">{rows.length}</span> program
-          </span>
         </div>
 
         <Table>
@@ -170,7 +180,7 @@ export function ProgramManager() {
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((p) => (
+              paged.pageRows.map((p) => (
                 <TableRow key={p.id}>
                   <TableCell className="pl-4">
                     <div className="grid gap-0.5">
@@ -232,6 +242,16 @@ export function ProgramManager() {
             )}
           </TableBody>
         </Table>
+
+        <TablePagination
+          from={paged.from}
+          label="program"
+          onPageChange={onPageChange}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          to={paged.to}
+          total={paged.total}
+        />
       </div>
 
       <ProgramDialog

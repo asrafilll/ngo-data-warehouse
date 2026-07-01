@@ -26,15 +26,23 @@ import { cn } from "@repo/ui/lib/utils";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CalendarDays, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { TablePagination, paginate } from "../../components/pagination";
 
 const incidentalCases = aidCases.filter((c) => c.aidType === "insidental");
 const programs = [...new Set(incidentalCases.map((c) => c.program))];
 const statusOptions = Object.entries(statusLabels) as Array<[WorkflowStatus, string]>;
 
-export function CaseList() {
+export function CaseList({
+  page,
+  onPageChange,
+}: {
+  page: number;
+  onPageChange: (next: number) => void;
+}) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<WorkflowStatus | "all">("all");
   const [program, setProgram] = useState<string>("all");
+  const resetPage = () => onPageChange(1);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -55,8 +63,10 @@ export function CaseList() {
     setQuery("");
     setStatus("all");
     setProgram("all");
+    resetPage();
   };
   const filtered = query !== "" || status !== "all" || program !== "all";
+  const paged = paginate(rows, page);
 
   return (
     <div className="mx-auto grid max-w-[1440px] gap-6">
@@ -82,13 +92,19 @@ export function CaseList() {
             <Search className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-muted-foreground" />
             <Input
               className="h-9 pl-9"
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                resetPage();
+              }}
               placeholder="Cari nama, NIK, nomor kasus, atau wilayah"
               value={query}
             />
           </div>
           <NativeSelect
-            onChange={(e) => setStatus(e.target.value as WorkflowStatus | "all")}
+            onChange={(e) => {
+              setStatus(e.target.value as WorkflowStatus | "all");
+              resetPage();
+            }}
             size="sm"
             value={status}
           >
@@ -99,7 +115,14 @@ export function CaseList() {
               </NativeSelectOption>
             ))}
           </NativeSelect>
-          <NativeSelect onChange={(e) => setProgram(e.target.value)} size="sm" value={program}>
+          <NativeSelect
+            onChange={(e) => {
+              setProgram(e.target.value);
+              resetPage();
+            }}
+            size="sm"
+            value={program}
+          >
             <NativeSelectOption value="all">Semua program</NativeSelectOption>
             {programs.map((p) => (
               <NativeSelectOption key={p} value={p}>
@@ -107,16 +130,12 @@ export function CaseList() {
               </NativeSelectOption>
             ))}
           </NativeSelect>
-        </div>
-
-        {/* result meta */}
-        <div className="flex items-center justify-between px-4 py-2.5 text-muted-foreground text-xs">
-          <span>
-            Menampilkan <span className="font-medium text-foreground">{rows.length}</span> dari{" "}
-            {incidentalCases.length} kasus
-          </span>
           {filtered ? (
-            <button className="hover:text-foreground" onClick={resetFilters} type="button">
+            <button
+              className="text-muted-foreground text-xs hover:text-foreground"
+              onClick={resetFilters}
+              type="button"
+            >
               Reset filter
             </button>
           ) : null}
@@ -141,10 +160,20 @@ export function CaseList() {
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((c) => <CaseRow caseItem={c} key={c.id} />)
+              paged.pageRows.map((c) => <CaseRow caseItem={c} key={c.id} />)
             )}
           </TableBody>
         </Table>
+
+        <TablePagination
+          from={paged.from}
+          label="kasus"
+          onPageChange={onPageChange}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          to={paged.to}
+          total={paged.total}
+        />
       </div>
     </div>
   );

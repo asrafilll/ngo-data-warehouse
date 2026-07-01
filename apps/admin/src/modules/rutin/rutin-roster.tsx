@@ -27,6 +27,7 @@ import {
 import { cn } from "@repo/ui/lib/utils";
 import { CheckCircle2, Plus, Wallet } from "lucide-react";
 import { useMemo, useState } from "react";
+import { TablePagination, paginate } from "../../components/pagination";
 import {
   type RutinBeneficiary,
   periods,
@@ -41,13 +42,20 @@ function formatMonth(iso: string) {
   );
 }
 
-export function RutinRoster() {
+export function RutinRoster({
+  page,
+  onPageChange,
+}: {
+  page: number;
+  onPageChange: (next: number) => void;
+}) {
   const [beneficiaries, setBeneficiaries] = useState<RutinBeneficiary[]>(rutinBeneficiaries);
   const [programId, setProgramId] = useState(rutinPrograms[0]?.id ?? "");
   const [periodKey, setPeriodKey] = useState(periods[0].key);
   // Disbursed sets keyed by `${programId}:${periodKey}`; lazily seeded on first access.
   const [disbursedMap, setDisbursedMap] = useState<Record<string, string[]>>({});
   const [addOpen, setAddOpen] = useState(false);
+  const resetPage = () => onPageChange(1);
 
   const program = rutinPrograms.find((p) => p.id === programId);
   const mapKey = `${programId}:${periodKey}`;
@@ -56,6 +64,7 @@ export function RutinRoster() {
     () => beneficiaries.filter((b) => b.programId === programId && b.since <= periodKey),
     [beneficiaries, programId, periodKey],
   );
+  const paged = paginate(roster, page);
 
   const disbursed = useMemo(() => {
     const stored = disbursedMap[mapKey];
@@ -133,14 +142,26 @@ export function RutinRoster() {
 
       {/* controls */}
       <div className="flex flex-wrap items-center gap-3">
-        <NativeSelect onChange={(e) => setProgramId(e.target.value)} value={programId}>
+        <NativeSelect
+          onChange={(e) => {
+            setProgramId(e.target.value);
+            resetPage();
+          }}
+          value={programId}
+        >
           {rutinPrograms.map((p) => (
             <NativeSelectOption key={p.id} value={p.id}>
               {p.name}
             </NativeSelectOption>
           ))}
         </NativeSelect>
-        <NativeSelect onChange={(e) => setPeriodKey(e.target.value)} value={periodKey}>
+        <NativeSelect
+          onChange={(e) => {
+            setPeriodKey(e.target.value);
+            resetPage();
+          }}
+          value={periodKey}
+        >
           {periods.map((p) => (
             <NativeSelectOption key={p.key} value={p.key}>
               {p.label}
@@ -205,7 +226,7 @@ export function RutinRoster() {
                 </TableCell>
               </TableRow>
             ) : (
-              roster.map((b) => {
+              paged.pageRows.map((b) => {
                 const done = disbursed.has(b.id);
                 return (
                   <TableRow key={b.id}>
@@ -256,6 +277,16 @@ export function RutinRoster() {
             )}
           </TableBody>
         </Table>
+
+        <TablePagination
+          from={paged.from}
+          label="penerima"
+          onPageChange={onPageChange}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          to={paged.to}
+          total={paged.total}
+        />
       </div>
 
       <AddBeneficiaryDialog

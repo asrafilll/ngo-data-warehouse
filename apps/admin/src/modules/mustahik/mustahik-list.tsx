@@ -14,6 +14,7 @@ import {
 import { useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { TablePagination, paginate } from "../../components/pagination";
 
 type MustahikEntry = {
   applicant: Applicant;
@@ -43,10 +44,17 @@ const mustahikList: MustahikEntry[] = (() => {
 
 const regions = [...new Set(mustahikList.map((m) => m.region))];
 
-export function MustahikList() {
+export function MustahikList({
+  page,
+  onPageChange,
+}: {
+  page: number;
+  onPageChange: (next: number) => void;
+}) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [region, setRegion] = useState("all");
+  const resetPage = () => onPageChange(1);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -60,6 +68,7 @@ export function MustahikList() {
       );
     });
   }, [query, region]);
+  const paged = paginate(rows, page);
 
   return (
     <div className="mx-auto grid max-w-[1440px] gap-6">
@@ -78,12 +87,22 @@ export function MustahikList() {
             <Search className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-muted-foreground" />
             <Input
               className="h-9 pl-9"
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                resetPage();
+              }}
               placeholder="Cari nama, NIK, atau wilayah"
               value={query}
             />
           </div>
-          <NativeSelect onChange={(e) => setRegion(e.target.value)} size="sm" value={region}>
+          <NativeSelect
+            onChange={(e) => {
+              setRegion(e.target.value);
+              resetPage();
+            }}
+            size="sm"
+            value={region}
+          >
             <NativeSelectOption value="all">Semua wilayah</NativeSelectOption>
             {regions.map((r) => (
               <NativeSelectOption key={r} value={r}>
@@ -91,10 +110,6 @@ export function MustahikList() {
               </NativeSelectOption>
             ))}
           </NativeSelect>
-        </div>
-
-        <div className="px-4 py-2.5 text-muted-foreground text-xs">
-          <span className="font-medium text-foreground">{rows.length}</span> mustahik
         </div>
 
         <Table>
@@ -117,7 +132,7 @@ export function MustahikList() {
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((m) => {
+              paged.pageRows.map((m) => {
                 const latest = m.cases[m.cases.length - 1];
                 return (
                   <TableRow
@@ -153,6 +168,16 @@ export function MustahikList() {
             )}
           </TableBody>
         </Table>
+
+        <TablePagination
+          from={paged.from}
+          label="mustahik"
+          onPageChange={onPageChange}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          to={paged.to}
+          total={paged.total}
+        />
       </div>
     </div>
   );

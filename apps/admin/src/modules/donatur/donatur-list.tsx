@@ -16,6 +16,7 @@ import {
 import { cn } from "@repo/ui/lib/utils";
 import { Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
+import { TablePagination, paginate } from "../../components/pagination";
 
 const statusDot: Record<Donor["status"], string> = {
   Aktif: "bg-primary",
@@ -23,10 +24,17 @@ const statusDot: Record<Donor["status"], string> = {
   Dormant: "bg-muted-foreground/40",
 };
 
-export function DonaturList() {
+export function DonaturList({
+  page,
+  onPageChange,
+}: {
+  page: number;
+  onPageChange: (next: number) => void;
+}) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<Donor["status"] | "all">("all");
   const [type, setType] = useState<Donor["type"] | "all">("all");
+  const resetPage = () => onPageChange(1);
 
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -37,6 +45,7 @@ export function DonaturList() {
       return d.name.toLowerCase().includes(q) || d.programPreference.toLowerCase().includes(q);
     });
   }, [query, status, type]);
+  const paged = paginate(rows, page);
 
   const totalDonation = donors.reduce((t, d) => t + d.totalDonation, 0);
   const activeCount = donors.filter((d) => d.status === "Aktif").length;
@@ -70,13 +79,19 @@ export function DonaturList() {
             <Search className="-translate-y-1/2 absolute top-1/2 left-3 size-4 text-muted-foreground" />
             <Input
               className="h-9 pl-9"
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                resetPage();
+              }}
               placeholder="Cari nama donatur atau preferensi program"
               value={query}
             />
           </div>
           <NativeSelect
-            onChange={(e) => setType(e.target.value as Donor["type"] | "all")}
+            onChange={(e) => {
+              setType(e.target.value as Donor["type"] | "all");
+              resetPage();
+            }}
             size="sm"
             value={type}
           >
@@ -86,7 +101,10 @@ export function DonaturList() {
             <NativeSelectOption value="Perusahaan">Perusahaan</NativeSelectOption>
           </NativeSelect>
           <NativeSelect
-            onChange={(e) => setStatus(e.target.value as Donor["status"] | "all")}
+            onChange={(e) => {
+              setStatus(e.target.value as Donor["status"] | "all");
+              resetPage();
+            }}
             size="sm"
             value={status}
           >
@@ -95,10 +113,6 @@ export function DonaturList() {
             <NativeSelectOption value="Perlu follow-up">Perlu follow-up</NativeSelectOption>
             <NativeSelectOption value="Dormant">Dormant</NativeSelectOption>
           </NativeSelect>
-        </div>
-
-        <div className="px-4 py-2.5 text-muted-foreground text-xs">
-          <span className="font-medium text-foreground">{rows.length}</span> donatur
         </div>
 
         <Table>
@@ -120,7 +134,7 @@ export function DonaturList() {
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((d) => (
+              paged.pageRows.map((d) => (
                 <TableRow key={d.id}>
                   <TableCell className="pl-4">
                     <div className="flex items-center gap-2">
@@ -148,6 +162,16 @@ export function DonaturList() {
             )}
           </TableBody>
         </Table>
+
+        <TablePagination
+          from={paged.from}
+          label="donatur"
+          onPageChange={onPageChange}
+          page={paged.page}
+          pageCount={paged.pageCount}
+          to={paged.to}
+          total={paged.total}
+        />
       </div>
     </div>
   );
