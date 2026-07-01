@@ -69,20 +69,6 @@ services:
         condition: service_healthy
     command: sh -c "pnpm db:push && pnpm --filter @repo/api start"
 
-  platform:
-    <<: *app
-    image: monorepo-template-app
-    container_name: monorepo-template-platform
-    restart: unless-stopped
-    environment:
-      VITE_API_URL: "${VITE_API_URL:-http://localhost:8000}"
-    ports:
-      - "3000:3000"
-    depends_on:
-      api:
-        condition: service_started
-    command: pnpm --filter @repo/platform dev
-
   admin:
     <<: *app
     image: monorepo-template-app

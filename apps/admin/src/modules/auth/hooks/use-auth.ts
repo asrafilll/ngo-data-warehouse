@@ -17,7 +17,7 @@ export function useLoginMutation() {
     mutationFn: login,
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: authQueryKey });
-      await navigate({ to: "/" });
+      await navigate({ to: "/dashboard" });
     },
   });
 }
@@ -30,7 +30,7 @@ export function useLogoutMutation() {
     mutationFn: logout,
     onSuccess: async () => {
       queryClient.removeQueries({ queryKey: authQueryKey });
-      await navigate({ to: "/login" });
+      await navigate({ to: "/" });
     },
   });
 }

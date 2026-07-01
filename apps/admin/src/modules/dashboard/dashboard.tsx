@@ -6,6 +6,7 @@ import { formatCurrency, getAssignedVerifier } from "@repo/sip-domain";
 import { cn } from "@repo/ui/lib/utils";
 import { ArrowRight, ArrowUpRight, Command, Clock, MapPin } from "lucide-react";
 import { useState } from "react";
+import { SipLogo } from "../../components/logo";
 import { BarList, Donut } from "./charts";
 import {
   aidCases,
@@ -47,9 +48,7 @@ export function Dashboard() {
       {/* command strip */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-xl px-6 py-4">
         <div className="flex items-center gap-3">
-          <span className="grid size-8 place-items-center rounded-md bg-primary font-semibold text-primary-foreground text-xs">
-            SIP
-          </span>
+          <SipLogo className="size-8 rounded-md" />
           <div>
             <p className="font-medium text-sm leading-none">Superadmin overview</p>
             <p className="mt-1 text-muted-foreground text-xs">
