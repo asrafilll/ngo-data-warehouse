@@ -1,5 +1,6 @@
 import { prisma } from "../../utils/prisma";
-import { usersListLimit } from "./utils";
+
+const usersListLimit = 20;
 
 export async function listRecentUsers() {
   const users = await prisma.user.findMany({

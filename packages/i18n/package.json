@@ -8,6 +8,11 @@
       "types": "./src/index.tsx",
       "import": "./src/index.tsx",
       "default": "./src/index.tsx"
+    },
+    "./frontend": {
+      "types": "./src/frontend.ts",
+      "import": "./src/frontend.ts",
+      "default": "./src/frontend.ts"
     }
   },
   "scripts": {

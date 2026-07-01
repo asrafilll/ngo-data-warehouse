@@ -1,4 +1,4 @@
-import { createFrontendI18n, type Resource } from "@repo/i18n";
+import { createFrontendI18n, type Resource } from "@repo/i18n/frontend";
 
 const resources = {
   en: {
