@@ -1,0 +1,2 @@
+[audit.rules]
+"dependency.hotspot" = "off"
