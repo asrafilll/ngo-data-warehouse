@@ -1,7 +1,17 @@
-import type { AidCase } from "./types";
+import { formatDateTime } from "./formatters";
+import { regionalIndexes } from "./regional-indexes";
+import { sipUsers } from "./users";
+import type {
+  AidCase,
+  Eligibility,
+  ProgramCategory,
+  VerificationPriority,
+  VerificationSummary,
+  WorkflowStatus,
+} from "./types";
 
-// Mock intake and verification cases used by the admin and verifier dashboards.
-export const aidCases: AidCase[] = [
+// Hand-authored cases with full narrative depth (power the case-detail demo).
+const baseAidCases: AidCase[] = [
   {
     id: "case-001",
     caseNumber: "SIP-2026-071",
@@ -423,3 +433,300 @@ export const aidCases: AidCase[] = [
     ],
   },
 ];
+
+// ── Generated caseload ───────────────────────────────────────────────────────
+// Deterministic filler so lists, charts, and funnels look realistic in the demo.
+// Kept lighter than the hand-authored cases above but fully typed.
+const femaleNames = [
+  "Aminah",
+  "Sri Wahyuni",
+  "Nurhayati",
+  "Maimunah",
+  "Kartini",
+  "Halimah",
+  "Rukmini",
+  "Sundari",
+  "Wati Suryani",
+  "Endang Puji",
+];
+const maleNames = [
+  "Slamet Riyadi",
+  "Bambang Sutrisno",
+  "Joko Susanto",
+  "Agus Salim",
+  "Dedi Kurniawan",
+  "Iwan Setiadi",
+  "Marwan",
+  "Sugianto",
+  "Tarno",
+  "Hendra Gunawan",
+];
+const jobs = [
+  "Buruh harian",
+  "Pedagang kecil",
+  "Tukang ojek",
+  "Pemulung",
+  "Asisten rumah tangga",
+  "Buruh cuci",
+  "Kuli bangunan",
+  "Penjahit",
+  "Petani",
+  "Sopir angkot",
+];
+const problems = [
+  "Biaya pengobatan menahun tidak tertanggung penghasilan harian.",
+  "Anak terancam putus sekolah karena tunggakan biaya pendidikan.",
+  "Kebutuhan pangan keluarga tidak tercukupi sejak kehilangan pekerjaan.",
+  "Rumah lapuk dan bocor parah, tidak layak huni.",
+];
+const insidentalPrograms: ProgramCategory[] = [
+  "Kesehatan",
+  "Pendidikan",
+  "Kebutuhan Pokok",
+  "Darurat Hunian",
+];
+const statusPlan: WorkflowStatus[] = [
+  "submitted",
+  "submitted",
+  "submitted",
+  "approved_for_verification",
+  "approved_for_verification",
+  "assigned",
+  "assigned",
+  "surveyed",
+  "surveyed",
+  "surveyed",
+  "approved",
+  "disbursement_pending",
+  "disbursement_pending",
+  "completed",
+  "completed",
+  "completed",
+  "needs_revision",
+  "rejected",
+];
+const submittedDates = [
+  "2026-05-19T09:10:00+07:00",
+  "2026-05-22T14:20:00+07:00",
+  "2026-05-26T10:05:00+07:00",
+  "2026-05-29T11:40:00+07:00",
+  "2026-06-02T08:30:00+07:00",
+  "2026-06-05T13:15:00+07:00",
+  "2026-06-08T15:50:00+07:00",
+  "2026-06-11T09:25:00+07:00",
+  "2026-06-14T10:35:00+07:00",
+  "2026-06-17T14:05:00+07:00",
+  "2026-06-19T11:20:00+07:00",
+  "2026-06-22T08:55:00+07:00",
+  "2026-06-24T16:10:00+07:00",
+  "2026-06-26T09:45:00+07:00",
+  "2026-06-28T13:30:00+07:00",
+  "2026-06-30T10:15:00+07:00",
+  "2026-07-01T09:00:00+07:00",
+  "2026-07-01T15:40:00+07:00",
+];
+
+const verifiers = sipUsers.filter((u) => u.role === "verifikator" && u.status === "Aktif");
+const stageOrder: WorkflowStatus[] = [
+  "submitted",
+  "approved_for_verification",
+  "assigned",
+  "surveyed",
+  "approved",
+  "disbursement_pending",
+  "completed",
+];
+const stageIndex = (s: WorkflowStatus) => stageOrder.indexOf(s);
+
+function eligibilityFor(ratio: number): Eligibility {
+  if (ratio < 0.4) return "Sangat Layak";
+  if (ratio < 0.65) return "Layak";
+  if (ratio < 0.85) return "Perlu Review";
+  return "Tidak Layak";
+}
+
+function buildVerification(
+  name: string,
+  region: string,
+  verifierName: string,
+  completed: boolean,
+): VerificationSummary {
+  return {
+    verifierName,
+    coverage: region,
+    verifiedAt: "2026-06-20T10:00:00+07:00",
+    background: `${name} menjadi tulang punggung keluarga dengan penghasilan tidak menentu.`,
+    currentCondition: "Kondisi ekonomi menurun, kebutuhan pokok kerap tertunda.",
+    requestedNeed: "Bantuan sesuai program yang direkomendasikan.",
+    effortsTaken: "Sudah berupaya mencari tambahan penghasilan dan mengurus SKTM.",
+    housingObservation: "Hunian sederhana dengan fasilitas terbatas.",
+    socialRecord: "Dikenal baik dan aktif di lingkungan sekitar.",
+    recommendation: "Direkomendasikan menerima bantuan sesuai kebutuhan.",
+    neighborContact: "Ketua RT setempat",
+    notes: "Perlu pemantauan lanjutan setelah penyaluran.",
+    photos: [
+      { label: "Foto hunian", kind: "Hunian", status: "Tersimpan" },
+      {
+        label: "Bukti penyaluran",
+        kind: "Penyaluran",
+        status: completed ? "Tersimpan" : "Wajib diunggah",
+      },
+    ],
+  };
+}
+
+function buildTimeline(status: WorkflowStatus, at: string, verifierName: string) {
+  const tl = [
+    {
+      label: "Pengajuan dibuat",
+      actor: "Fikri Ramadhan",
+      at,
+      note: "Data awal pemohon dan pelapor dicatat.",
+    },
+  ];
+  if (status === "needs_revision") {
+    tl.push({
+      label: "Dikembalikan untuk revisi",
+      actor: "Nur Azizah",
+      at,
+      note: "Data awal perlu dilengkapi.",
+    });
+    return tl;
+  }
+  if (status === "rejected") {
+    tl.push({
+      label: "Pengajuan ditolak",
+      actor: "Nur Azizah",
+      at,
+      note: "Belum memenuhi kriteria bantuan.",
+    });
+    return tl;
+  }
+  const s = stageIndex(status);
+  if (s >= 1)
+    tl.push({
+      label: "Disetujui untuk verifikasi",
+      actor: "Nur Azizah",
+      at,
+      note: "Diteruskan ke verifikator wilayah.",
+    });
+  if (s >= 3)
+    tl.push({
+      label: "Verifikasi selesai",
+      actor: verifierName,
+      at,
+      note: "Hasil survei lapangan tersimpan.",
+    });
+  if (s >= 4)
+    tl.push({
+      label: "Nominal disetujui",
+      actor: "Nur Azizah",
+      at,
+      note: "Keputusan nominal ditetapkan.",
+    });
+  if (s >= 6)
+    tl.push({
+      label: "Bantuan disalurkan",
+      actor: verifierName,
+      at,
+      note: "Bukti penyaluran tersimpan.",
+    });
+  return tl;
+}
+
+const generatedAidCases: AidCase[] = statusPlan.map((status, i) => {
+  const region = regionalIndexes[i % regionalIndexes.length];
+  const female = i % 2 === 0;
+  const name = female ? femaleNames[i % femaleNames.length] : maleNames[i % maleNames.length];
+  const program = insidentalPrograms[i % insidentalPrograms.length];
+  const verifier =
+    verifiers.find((v) => v.region === region.city) ?? verifiers[i % verifiers.length];
+  const s = stageIndex(status);
+
+  const need = region.familyMonthlyNeed;
+  const incomeRatio = [0.32, 0.48, 0.6, 0.74][i % 4];
+  const income = Math.round((need * incomeRatio) / 50_000) * 50_000;
+  const gap = Math.max(0, need - income);
+  const recommendedAid = Math.round(gap / 50_000) * 50_000;
+  const submittedAt = submittedDates[i % submittedDates.length];
+  const dateLabel = formatDateTime(submittedAt);
+  const hasVerification = s >= 3;
+  const decided = s >= 4;
+  const completed = status === "completed";
+
+  return {
+    id: `case-1${String(i).padStart(2, "0")}`,
+    caseNumber: `SIP-2026-1${String(i).padStart(2, "0")}`,
+    aidType: "insidental",
+    program,
+    status,
+    priority: (["urgent", "normal", "monitor", "normal"] as VerificationPriority[])[i % 4],
+    submittedBy: i % 2 === 0 ? "Fikri Ramadhan" : "Ahmad Ridwan",
+    submittedAt,
+    assignedVerifierId: s >= 2 ? verifier.id : undefined,
+    nextAction:
+      status === "submitted"
+        ? "Pengurus melakukan triase pengajuan."
+        : status === "surveyed"
+          ? "Pengurus menentukan nominal bantuan."
+          : "Lanjutkan sesuai tahap alur.",
+    problem: problems[i % problems.length],
+    applicant: {
+      name,
+      nik: (3_200_000_000_000_000 + i * 111_317).toString().slice(0, 16),
+      birthPlace: region.city,
+      birthDate: `19${70 + (i % 25)}-0${(i % 8) + 1}-1${i % 9}`,
+      age: 32 + ((i * 3) % 30),
+      gender: female ? "Perempuan" : "Laki-laki",
+      maritalStatus: (["Menikah", "Janda", "Duda", "Menikah"] as const)[i % 4],
+      address: `Kp. ${region.city} RT 0${(i % 8) + 1} RW 0${(i % 6) + 1}`,
+      housingStatus: (["Sewa/Kontrak", "Menumpang", "Milik Sendiri", "Tidak Memiliki"] as const)[
+        i % 4
+      ],
+      job: jobs[i % jobs.length],
+      incomeAmount: income,
+      incomePeriod: "per bulan",
+      dependents: i % 5,
+      phone: `0812-${String(1000 + i)}-${String(2000 + i * 7).slice(0, 4)}`,
+      prayerStatus: (["Ya", "Jarang", "Ya"] as const)[i % 3],
+      smokingStatus: (["Tidak", "Jarang", "Ya"] as const)[i % 3],
+      priorHelp: i % 3 === 0 ? "Pernah menerima sembako dari lingkungan." : "Belum pernah dibantu.",
+      publishConsent: i % 2 === 0,
+      sktmStatus: (["Sudah ada", "Bersedia mengurus", "Belum ada"] as const)[i % 3],
+      infoSource: (["Tetangga", "Relawan masjid", "Pengurus RT", "Guru sekolah"] as const)[i % 4],
+    },
+    reporter: {
+      name: `Ketua RT ${region.city}`,
+      relation: "Pelapor lingkungan",
+      institution: (["Masjid setempat", "RT/RW", "Yayasan lokal", "Perorangan"] as const)[i % 4],
+      address: region.city,
+      phone: `0813-${String(3000 + i)}-${String(4000 + i * 3).slice(0, 4)}`,
+    },
+    decisionNominal: decided ? recommendedAid : undefined,
+    disbursedAt: completed ? "2026-06-27T14:00:00+07:00" : undefined,
+    hadKifayah: {
+      region: region.city,
+      province: region.province,
+      familyMonthlyNeed: need,
+      perCapitaNeed: region.perCapitaNeed,
+      actualMonthlyIncome: income,
+      financialGap: gap,
+      recommendedAid,
+      eligibility: eligibilityFor(incomeRatio),
+      components: [
+        { label: "Makanan", amount: Math.round(need * 0.42) },
+        { label: "Tempat tinggal", amount: Math.round(need * 0.18) },
+        { label: "Pendidikan anak", amount: Math.round(need * 0.15) },
+        { label: "Kesehatan", amount: Math.round(need * 0.13) },
+        { label: "Transportasi & ibadah", amount: Math.round(need * 0.12) },
+      ],
+    },
+    verification: hasVerification
+      ? buildVerification(name, region.city, verifier.name, completed)
+      : undefined,
+    timeline: buildTimeline(status, dateLabel, verifier.name),
+  } satisfies AidCase;
+});
+
+// Mock intake and verification cases used by the admin and verifier dashboards.
+export const aidCases: AidCase[] = [...baseAidCases, ...generatedAidCases];

@@ -100,6 +100,72 @@ export const rutinBeneficiaries: RutinBeneficiary[] = [
     nominal: 450_000,
     since: "2026-05",
   },
+  // Anak Asuh (lanjutan)
+  {
+    id: "rb-010",
+    programId: "prg-anak-asuh",
+    name: "Dimas Prasetyo",
+    region: "Depok",
+    nik: "3276041104100010",
+    nominal: 750_000,
+    since: "2025-12",
+  },
+  {
+    id: "rb-011",
+    programId: "prg-anak-asuh",
+    name: "Kirana Maharani",
+    region: "Bogor",
+    nik: "3271055503120011",
+    nominal: 800_000,
+    since: "2026-04",
+  },
+  // Anak Yatim (lanjutan)
+  {
+    id: "rb-012",
+    programId: "prg-anak-yatim",
+    name: "Ibrahim Musa",
+    region: "Bekasi",
+    nik: "3275040207120012",
+    nominal: 500_000,
+    since: "2025-10",
+  },
+  {
+    id: "rb-013",
+    programId: "prg-anak-yatim",
+    name: "Khadijah Amira",
+    region: "Kota Tangerang",
+    nik: "3671052809130013",
+    nominal: 550_000,
+    since: "2026-01",
+  },
+  {
+    id: "rb-014",
+    programId: "prg-anak-yatim",
+    name: "Ali Firmansyah",
+    region: "Karawang",
+    nik: "3215041506110014",
+    nominal: 500_000,
+    since: "2026-03",
+  },
+  // Tahfidz (lanjutan)
+  {
+    id: "rb-015",
+    programId: "prg-tahfidz",
+    name: "Bilal Saputra",
+    region: "Bekasi",
+    nik: "3275041712100015",
+    nominal: 400_000,
+    since: "2025-09",
+  },
+  {
+    id: "rb-016",
+    programId: "prg-tahfidz",
+    name: "Maryam Solehah",
+    region: "Depok",
+    nik: "3276046011120016",
+    nominal: 450_000,
+    since: "2026-02",
+  },
 ];
 
 export type Period = { key: string; label: string };

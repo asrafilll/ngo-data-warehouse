@@ -12,7 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppProgramRouteImport } from './routes/_app/program'
+import { Route as AppPengaturanRouteImport } from './routes/_app/pengaturan'
 import { Route as AppPengajuanBaruRouteImport } from './routes/_app/pengajuan-baru'
+import { Route as AppMustahikRouteImport } from './routes/_app/mustahik'
+import { Route as AppLaporanRouteImport } from './routes/_app/laporan'
+import { Route as AppDonaturRouteImport } from './routes/_app/donatur'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppBantuanRutinRouteImport } from './routes/_app/bantuan-rutin'
 import { Route as AppBantuanInsidentalRouteImport } from './routes/_app/bantuan-insidental'
@@ -32,9 +36,29 @@ const AppProgramRoute = AppProgramRouteImport.update({
   path: '/program',
   getParentRoute: () => AppRoute,
 } as any)
+const AppPengaturanRoute = AppPengaturanRouteImport.update({
+  id: '/pengaturan',
+  path: '/pengaturan',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppPengajuanBaruRoute = AppPengajuanBaruRouteImport.update({
   id: '/pengajuan-baru',
   path: '/pengajuan-baru',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppMustahikRoute = AppMustahikRouteImport.update({
+  id: '/mustahik',
+  path: '/mustahik',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLaporanRoute = AppLaporanRouteImport.update({
+  id: '/laporan',
+  path: '/laporan',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppDonaturRoute = AppDonaturRouteImport.update({
+  id: '/donatur',
+  path: '/donatur',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
@@ -63,7 +87,11 @@ export interface FileRoutesByFullPath {
   '/bantuan-insidental': typeof AppBantuanInsidentalRoute
   '/bantuan-rutin': typeof AppBantuanRutinRoute
   '/dashboard': typeof AppDashboardRoute
+  '/donatur': typeof AppDonaturRoute
+  '/laporan': typeof AppLaporanRoute
+  '/mustahik': typeof AppMustahikRoute
   '/pengajuan-baru': typeof AppPengajuanBaruRoute
+  '/pengaturan': typeof AppPengaturanRoute
   '/program': typeof AppProgramRoute
   '/kasus/$caseId': typeof AppKasusCaseIdRoute
 }
@@ -72,7 +100,11 @@ export interface FileRoutesByTo {
   '/bantuan-insidental': typeof AppBantuanInsidentalRoute
   '/bantuan-rutin': typeof AppBantuanRutinRoute
   '/dashboard': typeof AppDashboardRoute
+  '/donatur': typeof AppDonaturRoute
+  '/laporan': typeof AppLaporanRoute
+  '/mustahik': typeof AppMustahikRoute
   '/pengajuan-baru': typeof AppPengajuanBaruRoute
+  '/pengaturan': typeof AppPengaturanRoute
   '/program': typeof AppProgramRoute
   '/kasus/$caseId': typeof AppKasusCaseIdRoute
 }
@@ -83,7 +115,11 @@ export interface FileRoutesById {
   '/_app/bantuan-insidental': typeof AppBantuanInsidentalRoute
   '/_app/bantuan-rutin': typeof AppBantuanRutinRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/donatur': typeof AppDonaturRoute
+  '/_app/laporan': typeof AppLaporanRoute
+  '/_app/mustahik': typeof AppMustahikRoute
   '/_app/pengajuan-baru': typeof AppPengajuanBaruRoute
+  '/_app/pengaturan': typeof AppPengaturanRoute
   '/_app/program': typeof AppProgramRoute
   '/_app/kasus/$caseId': typeof AppKasusCaseIdRoute
 }
@@ -94,7 +130,11 @@ export interface FileRouteTypes {
     | '/bantuan-insidental'
     | '/bantuan-rutin'
     | '/dashboard'
+    | '/donatur'
+    | '/laporan'
+    | '/mustahik'
     | '/pengajuan-baru'
+    | '/pengaturan'
     | '/program'
     | '/kasus/$caseId'
   fileRoutesByTo: FileRoutesByTo
@@ -103,7 +143,11 @@ export interface FileRouteTypes {
     | '/bantuan-insidental'
     | '/bantuan-rutin'
     | '/dashboard'
+    | '/donatur'
+    | '/laporan'
+    | '/mustahik'
     | '/pengajuan-baru'
+    | '/pengaturan'
     | '/program'
     | '/kasus/$caseId'
   id:
@@ -113,7 +157,11 @@ export interface FileRouteTypes {
     | '/_app/bantuan-insidental'
     | '/_app/bantuan-rutin'
     | '/_app/dashboard'
+    | '/_app/donatur'
+    | '/_app/laporan'
+    | '/_app/mustahik'
     | '/_app/pengajuan-baru'
+    | '/_app/pengaturan'
     | '/_app/program'
     | '/_app/kasus/$caseId'
   fileRoutesById: FileRoutesById
@@ -146,11 +194,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProgramRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/pengaturan': {
+      id: '/_app/pengaturan'
+      path: '/pengaturan'
+      fullPath: '/pengaturan'
+      preLoaderRoute: typeof AppPengaturanRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/pengajuan-baru': {
       id: '/_app/pengajuan-baru'
       path: '/pengajuan-baru'
       fullPath: '/pengajuan-baru'
       preLoaderRoute: typeof AppPengajuanBaruRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/mustahik': {
+      id: '/_app/mustahik'
+      path: '/mustahik'
+      fullPath: '/mustahik'
+      preLoaderRoute: typeof AppMustahikRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/laporan': {
+      id: '/_app/laporan'
+      path: '/laporan'
+      fullPath: '/laporan'
+      preLoaderRoute: typeof AppLaporanRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/donatur': {
+      id: '/_app/donatur'
+      path: '/donatur'
+      fullPath: '/donatur'
+      preLoaderRoute: typeof AppDonaturRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/dashboard': {
@@ -188,7 +264,11 @@ interface AppRouteChildren {
   AppBantuanInsidentalRoute: typeof AppBantuanInsidentalRoute
   AppBantuanRutinRoute: typeof AppBantuanRutinRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppDonaturRoute: typeof AppDonaturRoute
+  AppLaporanRoute: typeof AppLaporanRoute
+  AppMustahikRoute: typeof AppMustahikRoute
   AppPengajuanBaruRoute: typeof AppPengajuanBaruRoute
+  AppPengaturanRoute: typeof AppPengaturanRoute
   AppProgramRoute: typeof AppProgramRoute
   AppKasusCaseIdRoute: typeof AppKasusCaseIdRoute
 }
@@ -197,7 +277,11 @@ const AppRouteChildren: AppRouteChildren = {
   AppBantuanInsidentalRoute: AppBantuanInsidentalRoute,
   AppBantuanRutinRoute: AppBantuanRutinRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppDonaturRoute: AppDonaturRoute,
+  AppLaporanRoute: AppLaporanRoute,
+  AppMustahikRoute: AppMustahikRoute,
   AppPengajuanBaruRoute: AppPengajuanBaruRoute,
+  AppPengaturanRoute: AppPengaturanRoute,
   AppProgramRoute: AppProgramRoute,
   AppKasusCaseIdRoute: AppKasusCaseIdRoute,
 }

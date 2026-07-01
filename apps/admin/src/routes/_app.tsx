@@ -31,10 +31,10 @@ const navigationItems: NavItem[] = [
   { label: "Bantuan Insidental", icon: HeartHandshake, to: "/bantuan-insidental" },
   { label: "Bantuan Rutin", icon: CalendarClock, to: "/bantuan-rutin" },
   { label: "Program", icon: Database, to: "/program" },
-  { label: "Mustahik", icon: UsersRound },
-  { label: "Donatur", icon: Banknote },
-  { label: "Laporan", icon: BarChart3 },
-  { label: "Pengaturan", icon: Settings },
+  { label: "Mustahik", icon: UsersRound, to: "/mustahik" },
+  { label: "Donatur", icon: Banknote, to: "/donatur" },
+  { label: "Laporan", icon: BarChart3, to: "/laporan" },
+  { label: "Pengaturan", icon: Settings, to: "/pengaturan" },
 ];
 
 function AppLayout() {
