@@ -23,6 +23,7 @@ import {
 } from "@repo/ui/components/table";
 import { Badge } from "@repo/ui/components/badge";
 import { cn } from "@repo/ui/lib/utils";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { CalendarDays, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -66,9 +67,11 @@ export function CaseList() {
             Kasus bantuan sekali selesai — dari pengajuan hingga penyaluran.
           </p>
         </div>
-        <Button type="button">
-          <Plus className="size-4" strokeWidth={1.8} />
-          Pengajuan baru
+        <Button asChild>
+          <Link to="/pengajuan-baru">
+            <Plus className="size-4" strokeWidth={1.8} />
+            Pengajuan baru
+          </Link>
         </Button>
       </header>
 
@@ -149,8 +152,12 @@ export function CaseList() {
 
 function CaseRow({ caseItem: c }: { caseItem: AidCase }) {
   const verifier = getAssignedVerifier(c);
+  const navigate = useNavigate();
   return (
-    <TableRow className="cursor-pointer">
+    <TableRow
+      className="cursor-pointer"
+      onClick={() => navigate({ to: "/kasus/$caseId", params: { caseId: c.id } })}
+    >
       <TableCell className="pl-4">
         <div className="grid gap-0.5">
           <span className="font-medium">{c.caseNumber}</span>

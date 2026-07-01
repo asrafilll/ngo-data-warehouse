@@ -92,8 +92,8 @@ function AppLayout() {
                   <Badge className="hidden sm:inline-flex" variant="secondary">
                     Prototype validasi
                   </Badge>
-                  <Button size="sm" type="button">
-                    Pengajuan baru
+                  <Button asChild size="sm">
+                    <Link to="/pengajuan-baru">Pengajuan baru</Link>
                   </Button>
                 </div>
               </div>

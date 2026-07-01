@@ -12,9 +12,11 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppProgramRouteImport } from './routes/_app/program'
+import { Route as AppPengajuanBaruRouteImport } from './routes/_app/pengajuan-baru'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
 import { Route as AppBantuanRutinRouteImport } from './routes/_app/bantuan-rutin'
 import { Route as AppBantuanInsidentalRouteImport } from './routes/_app/bantuan-insidental'
+import { Route as AppKasusCaseIdRouteImport } from './routes/_app/kasus.$caseId'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -28,6 +30,11 @@ const IndexRoute = IndexRouteImport.update({
 const AppProgramRoute = AppProgramRouteImport.update({
   id: '/program',
   path: '/program',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppPengajuanBaruRoute = AppPengajuanBaruRouteImport.update({
+  id: '/pengajuan-baru',
+  path: '/pengajuan-baru',
   getParentRoute: () => AppRoute,
 } as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
@@ -45,20 +52,29 @@ const AppBantuanInsidentalRoute = AppBantuanInsidentalRouteImport.update({
   path: '/bantuan-insidental',
   getParentRoute: () => AppRoute,
 } as any)
+const AppKasusCaseIdRoute = AppKasusCaseIdRouteImport.update({
+  id: '/kasus/$caseId',
+  path: '/kasus/$caseId',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/bantuan-insidental': typeof AppBantuanInsidentalRoute
   '/bantuan-rutin': typeof AppBantuanRutinRoute
   '/dashboard': typeof AppDashboardRoute
+  '/pengajuan-baru': typeof AppPengajuanBaruRoute
   '/program': typeof AppProgramRoute
+  '/kasus/$caseId': typeof AppKasusCaseIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/bantuan-insidental': typeof AppBantuanInsidentalRoute
   '/bantuan-rutin': typeof AppBantuanRutinRoute
   '/dashboard': typeof AppDashboardRoute
+  '/pengajuan-baru': typeof AppPengajuanBaruRoute
   '/program': typeof AppProgramRoute
+  '/kasus/$caseId': typeof AppKasusCaseIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -67,7 +83,9 @@ export interface FileRoutesById {
   '/_app/bantuan-insidental': typeof AppBantuanInsidentalRoute
   '/_app/bantuan-rutin': typeof AppBantuanRutinRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/pengajuan-baru': typeof AppPengajuanBaruRoute
   '/_app/program': typeof AppProgramRoute
+  '/_app/kasus/$caseId': typeof AppKasusCaseIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -76,9 +94,18 @@ export interface FileRouteTypes {
     | '/bantuan-insidental'
     | '/bantuan-rutin'
     | '/dashboard'
+    | '/pengajuan-baru'
     | '/program'
+    | '/kasus/$caseId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/bantuan-insidental' | '/bantuan-rutin' | '/dashboard' | '/program'
+  to:
+    | '/'
+    | '/bantuan-insidental'
+    | '/bantuan-rutin'
+    | '/dashboard'
+    | '/pengajuan-baru'
+    | '/program'
+    | '/kasus/$caseId'
   id:
     | '__root__'
     | '/'
@@ -86,7 +113,9 @@ export interface FileRouteTypes {
     | '/_app/bantuan-insidental'
     | '/_app/bantuan-rutin'
     | '/_app/dashboard'
+    | '/_app/pengajuan-baru'
     | '/_app/program'
+    | '/_app/kasus/$caseId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -117,6 +146,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProgramRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/pengajuan-baru': {
+      id: '/_app/pengajuan-baru'
+      path: '/pengajuan-baru'
+      fullPath: '/pengajuan-baru'
+      preLoaderRoute: typeof AppPengajuanBaruRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -138,6 +174,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppBantuanInsidentalRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/kasus/$caseId': {
+      id: '/_app/kasus/$caseId'
+      path: '/kasus/$caseId'
+      fullPath: '/kasus/$caseId'
+      preLoaderRoute: typeof AppKasusCaseIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -145,14 +188,18 @@ interface AppRouteChildren {
   AppBantuanInsidentalRoute: typeof AppBantuanInsidentalRoute
   AppBantuanRutinRoute: typeof AppBantuanRutinRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppPengajuanBaruRoute: typeof AppPengajuanBaruRoute
   AppProgramRoute: typeof AppProgramRoute
+  AppKasusCaseIdRoute: typeof AppKasusCaseIdRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
   AppBantuanInsidentalRoute: AppBantuanInsidentalRoute,
   AppBantuanRutinRoute: AppBantuanRutinRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppPengajuanBaruRoute: AppPengajuanBaruRoute,
   AppProgramRoute: AppProgramRoute,
+  AppKasusCaseIdRoute: AppKasusCaseIdRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
