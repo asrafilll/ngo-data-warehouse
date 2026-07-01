@@ -64,7 +64,7 @@ function LoginPage() {
             </span>
           </div>
 
-          <h1 className="font-semibold text-2xl tracking-tight">Masuk ke konsol</h1>
+          <h1 className="font-semibold text-2xl tracking-tight">Masuk ke Dashboard</h1>
           <p className="mt-1.5 text-muted-foreground text-sm">
             Gunakan akun amil Anda untuk mengakses sistem.
           </p>

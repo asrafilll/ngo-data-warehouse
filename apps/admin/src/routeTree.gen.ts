@@ -11,7 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AppProgramRouteImport } from './routes/_app/program'
 import { Route as AppDashboardRouteImport } from './routes/_app/dashboard'
+import { Route as AppBantuanRutinRouteImport } from './routes/_app/bantuan-rutin'
+import { Route as AppBantuanInsidentalRouteImport } from './routes/_app/bantuan-insidental'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -22,32 +25,68 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AppProgramRoute = AppProgramRouteImport.update({
+  id: '/program',
+  path: '/program',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDashboardRoute = AppDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AppRoute,
 } as any)
+const AppBantuanRutinRoute = AppBantuanRutinRouteImport.update({
+  id: '/bantuan-rutin',
+  path: '/bantuan-rutin',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppBantuanInsidentalRoute = AppBantuanInsidentalRouteImport.update({
+  id: '/bantuan-insidental',
+  path: '/bantuan-insidental',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/bantuan-insidental': typeof AppBantuanInsidentalRoute
+  '/bantuan-rutin': typeof AppBantuanRutinRoute
   '/dashboard': typeof AppDashboardRoute
+  '/program': typeof AppProgramRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/bantuan-insidental': typeof AppBantuanInsidentalRoute
+  '/bantuan-rutin': typeof AppBantuanRutinRoute
   '/dashboard': typeof AppDashboardRoute
+  '/program': typeof AppProgramRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_app': typeof AppRouteWithChildren
+  '/_app/bantuan-insidental': typeof AppBantuanInsidentalRoute
+  '/_app/bantuan-rutin': typeof AppBantuanRutinRoute
   '/_app/dashboard': typeof AppDashboardRoute
+  '/_app/program': typeof AppProgramRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard'
+  fullPaths:
+    | '/'
+    | '/bantuan-insidental'
+    | '/bantuan-rutin'
+    | '/dashboard'
+    | '/program'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard'
-  id: '__root__' | '/' | '/_app' | '/_app/dashboard'
+  to: '/' | '/bantuan-insidental' | '/bantuan-rutin' | '/dashboard' | '/program'
+  id:
+    | '__root__'
+    | '/'
+    | '/_app'
+    | '/_app/bantuan-insidental'
+    | '/_app/bantuan-rutin'
+    | '/_app/dashboard'
+    | '/_app/program'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -71,6 +110,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_app/program': {
+      id: '/_app/program'
+      path: '/program'
+      fullPath: '/program'
+      preLoaderRoute: typeof AppProgramRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/dashboard': {
       id: '/_app/dashboard'
       path: '/dashboard'
@@ -78,15 +124,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppDashboardRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/bantuan-rutin': {
+      id: '/_app/bantuan-rutin'
+      path: '/bantuan-rutin'
+      fullPath: '/bantuan-rutin'
+      preLoaderRoute: typeof AppBantuanRutinRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/bantuan-insidental': {
+      id: '/_app/bantuan-insidental'
+      path: '/bantuan-insidental'
+      fullPath: '/bantuan-insidental'
+      preLoaderRoute: typeof AppBantuanInsidentalRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
+  AppBantuanInsidentalRoute: typeof AppBantuanInsidentalRoute
+  AppBantuanRutinRoute: typeof AppBantuanRutinRoute
   AppDashboardRoute: typeof AppDashboardRoute
+  AppProgramRoute: typeof AppProgramRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppBantuanInsidentalRoute: AppBantuanInsidentalRoute,
+  AppBantuanRutinRoute: AppBantuanRutinRoute,
   AppDashboardRoute: AppDashboardRoute,
+  AppProgramRoute: AppProgramRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

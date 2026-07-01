@@ -3,16 +3,14 @@ import { Button } from "@repo/ui/components/button";
 import {
   Banknote,
   BarChart3,
-  ClipboardList,
+  CalendarClock,
   Database,
-  FileCheck2,
   HeartHandshake,
   LayoutDashboard,
   LogOut,
   Settings,
   ShieldCheck,
   UsersRound,
-  WalletCards,
 } from "lucide-react";
 import type { ComponentType } from "react";
 import { createFileRoute, Link, Outlet, useNavigate } from "@tanstack/react-router";
@@ -30,13 +28,11 @@ type NavItem = {
 
 const navigationItems: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" },
-  { label: "Data Bantuan", icon: HeartHandshake },
-  { label: "Pengajuan", icon: ClipboardList },
-  { label: "Verifikasi", icon: FileCheck2 },
-  { label: "Penyaluran", icon: WalletCards },
+  { label: "Bantuan Insidental", icon: HeartHandshake, to: "/bantuan-insidental" },
+  { label: "Bantuan Rutin", icon: CalendarClock, to: "/bantuan-rutin" },
+  { label: "Program", icon: Database, to: "/program" },
   { label: "Mustahik", icon: UsersRound },
   { label: "Donatur", icon: Banknote },
-  { label: "Program", icon: Database },
   { label: "Laporan", icon: BarChart3 },
   { label: "Pengaturan", icon: Settings },
 ];
@@ -88,7 +84,7 @@ function AppLayout() {
                 </Link>
 
                 <div className="hidden lg:block">
-                  <h1 className="font-semibold text-sm">Konsol Manajemen SIP</h1>
+                  <h1 className="font-semibold text-sm">Manajemen SIP</h1>
                   <p className="text-muted-foreground text-xs">Solidaritas Insan Peduli</p>
                 </div>
 
