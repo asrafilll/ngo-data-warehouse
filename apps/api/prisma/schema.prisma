@@ -18,8 +18,16 @@ model User {
   banned        Boolean?
   banReason     String?
   banExpires    DateTime?
+  // SIP amil profile
+  phone         String?
+  region        String?
+  active        Boolean   @default(true)
   sessions      Session[]
   accounts      Account[]
+
+  submittedCases AidCase[]           @relation("SubmittedCases")
+  assignedCases  AidCase[]           @relation("AssignedCases")
+  verifications  FieldVerification[]
 }
 
 model Session {
@@ -59,4 +67,278 @@ model Verification {
   expiresAt  DateTime
   createdAt  DateTime? @default(now())
   updatedAt  DateTime? @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// SIP domain
+// ---------------------------------------------------------------------------
+
+enum ProgramType {
+  insidental
+  rutin
+}
+
+enum AidType {
+  insidental
+  rutin_bulanan
+}
+
+enum WorkflowStatus {
+  submitted
+  approved_for_verification
+  assigned
+  surveyed
+  approved
+  rejected
+  disbursement_pending
+  completed
+  needs_revision
+}
+
+enum VerificationPriority {
+  urgent
+  normal
+  monitor
+}
+
+enum PhotoKind {
+  hunian
+  penyaluran
+  dokumen
+}
+
+// Master program (drives both aid tracks). Indonesian-label fields are stored as
+// plain strings and validated with zod at the API boundary.
+model Program {
+  id             String      @id @default(uuid())
+  name           String      @unique
+  type           ProgramType
+  description    String
+  active         Boolean     @default(true)
+  // Default monthly nominal per beneficiary — rutin programs only. Amounts are IDR.
+  defaultNominal Int?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  cases              AidCase[]
+  rutinBeneficiaries RutinBeneficiary[]
+}
+
+// Master indeks Had Kifayah per kabupaten/kota (PRD §5 had_kifayah_wilayah).
+model RegionalIndex {
+  id                String   @id @default(uuid())
+  province          String
+  city              String   @unique
+  familyMonthlyNeed Int
+  perCapitaNeed     Int
+  foodIndex         Float    @default(1)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  mustahik Mustahik[]
+}
+
+// Master profil mustahik, deduplicated by NIK.
+model Mustahik {
+  id             String         @id @default(uuid())
+  nik            String         @unique
+  name           String
+  birthPlace     String         @default("")
+  birthDate      String         @default("") // ISO date; free-text tolerated at intake
+  age            Int
+  gender         String // "Laki-laki" | "Perempuan"
+  maritalStatus  String
+  address        String
+  housingStatus  String
+  rentCost       Int?
+  job            String
+  incomeAmount   Int
+  incomePeriod   String // "per hari" | "per pekan" | "per bulan"
+  dependents     Int
+  phone          String
+  prayerStatus   String // "Ya" | "Jarang" | "Tidak"
+  smokingStatus  String
+  priorHelp      String         @default("")
+  publishConsent Boolean        @default(false)
+  sktmStatus     String // "Belum ada" | "Bersedia mengurus" | "Sudah ada"
+  infoSource     String         @default("")
+  isRutin        Boolean        @default(false)
+  regionId       String?
+  region         RegionalIndex? @relation(fields: [regionId], references: [id])
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  cases              AidCase[]
+  rutinBeneficiaries RutinBeneficiary[]
+}
+
+model Pelapor {
+  id          String @id @default(uuid())
+  name        String
+  relation    String
+  institution String
+  address     String
+  phone       String
+
+  cases AidCase[]
+}
+
+// Transaksi kasus bantuan (PRD pengajuan_bantuan) — one row per insidental case.
+model AidCase {
+  id                 String               @id @default(uuid())
+  caseNumber         String               @unique
+  aidType            AidType              @default(insidental)
+  programId          String
+  program            Program              @relation(fields: [programId], references: [id])
+  status             WorkflowStatus       @default(submitted)
+  priority           VerificationPriority @default(normal)
+  problem            String
+  nextAction         String               @default("")
+  mustahikId         String
+  mustahik           Mustahik             @relation(fields: [mustahikId], references: [id])
+  pelaporId          String?
+  pelapor            Pelapor?             @relation(fields: [pelaporId], references: [id])
+  submittedById      String?
+  submittedBy        User?                @relation("SubmittedCases", fields: [submittedById], references: [id])
+  submittedAt        DateTime             @default(now())
+  assignedVerifierId String?
+  assignedVerifier   User?                @relation("AssignedCases", fields: [assignedVerifierId], references: [id])
+  decisionNominal    Int?
+  decisionNote       String?
+  decidedAt          DateTime?
+  disbursedAt        DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  verification FieldVerification?
+  disbursement Disbursement?
+  events       CaseEvent[]
+  photos       CasePhoto[]
+
+  @@index([status])
+  @@index([programId])
+}
+
+// Timeline audit trail — one row per workflow transition / notable action.
+model CaseEvent {
+  id     String   @id @default(uuid())
+  caseId String
+  case   AidCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  label  String
+  actor  String
+  note   String   @default("")
+  at     DateTime @default(now())
+
+  @@index([caseId])
+}
+
+// Form 2 — verifikasi lapangan (PRD verifikasi_lapangan), 1:1 with case.
+model FieldVerification {
+  id                 String    @id @default(uuid())
+  caseId             String    @unique
+  case               AidCase   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  verifierId         String?
+  verifier           User?     @relation(fields: [verifierId], references: [id])
+  coverage           String    @default("")
+  verifiedAt         DateTime?
+  rentCost           Int?
+  rentPeriod         String    @default("tidak_sewa") // per_bulan | per_tahun | tidak_sewa
+  actualJob          String    @default("")
+  actualIncome       Int       @default(0)
+  dependentsDetail   String    @default("") // rincian nama/usia/status sekolah
+  background         String    @default("")
+  currentCondition   String    @default("")
+  requestedNeed      String    @default("")
+  effortsTaken       String    @default("")
+  housingObservation String    @default("")
+  lengthOfStay       String    @default("")
+  socialRecord       String    @default("")
+  recommendation     String    @default("")
+  neighborContact    String    @default("")
+  notes              String    @default("")
+  // Snapshot of the Had Kifayah calculation at survey time (IDR / month).
+  hadKifayahValue    Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+}
+
+// Foto kasus — hunian (Form 2), bukti penyaluran, dokumen. Stored as S3 keys (WebP).
+model CasePhoto {
+  id         String    @id @default(uuid())
+  caseId     String
+  case       AidCase   @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  kind       PhotoKind
+  label      String    @default("")
+  storageKey String
+  createdAt  DateTime  @default(now())
+
+  @@index([caseId])
+}
+
+// Penyaluran & tutup kasus (PRD penyaluran_bantuan), 1:1 with case.
+model Disbursement {
+  id          String   @id @default(uuid())
+  caseId      String   @unique
+  case        AidCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  nominal     Int
+  disbursedAt DateTime @default(now())
+  buktiKey    String // WebP bukti foto — required before status becomes completed
+  createdAt   DateTime @default(now())
+}
+
+// Standing roster bantuan rutin bulanan.
+model RutinBeneficiary {
+  id         String   @id @default(uuid())
+  programId  String
+  program    Program  @relation(fields: [programId], references: [id])
+  mustahikId String
+  mustahik   Mustahik @relation(fields: [mustahikId], references: [id])
+  nominal    Int
+  since      String // "YYYY-MM" the beneficiary joined the roster
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  disbursements RutinDisbursement[]
+
+  @@unique([programId, mustahikId])
+}
+
+// Penyaluran rutin per periode "YYYY-MM".
+model RutinDisbursement {
+  id            String           @id @default(uuid())
+  beneficiaryId String
+  beneficiary   RutinBeneficiary @relation(fields: [beneficiaryId], references: [id], onDelete: Cascade)
+  period        String // "YYYY-MM"
+  disbursedAt   DateTime         @default(now())
+  actor         String           @default("")
+
+  @@unique([beneficiaryId, period])
+  @@index([period])
+}
+
+model Donor {
+  id                String    @id @default(uuid())
+  name              String
+  type              String // Individu | Komunitas | Perusahaan
+  channel           String // Transfer Bank | QRIS | Tunai | Payroll
+  lastDonationAt    DateTime?
+  totalDonation     Int       @default(0)
+  recurring         Boolean   @default(false)
+  programPreference String    @default("Umum")
+  status            String    @default("Aktif") // Aktif | Perlu follow-up | Dormant
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// Singleton org profile + preferences (Pengaturan → Lembaga/Preferensi).
+model OrgSettings {
+  id          Int      @id @default(1)
+  name        String   @default("Solidaritas Insan Peduli")
+  legalName   String   @default("")
+  address     String   @default("")
+  phone       String   @default("")
+  email       String   @default("")
+  preferences Json     @default("{}")
+  updatedAt   DateTime @updatedAt
 }

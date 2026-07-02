@@ -10,3 +10,5 @@ export function createApiClient(baseUrl: string) {
 }
 
 export type ApiClient = ReturnType<typeof createApiClient>;
+
+export type { InferRequestType, InferResponseType } from "hono/client";

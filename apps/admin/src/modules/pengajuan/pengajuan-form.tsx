@@ -1,6 +1,5 @@
 // Formulir 1 — Pengajuan Bantuan Insidental (Data Pemohon/Mustahik + Data Pelapor).
-// Intake form per PRD §3.1, mocked: on submit it toasts and returns to the case list
-// (no backend). Diinput oleh Admin atau Verifikator.
+// Intake form per PRD §3.1, wired to POST /cases. Diinput oleh Admin atau Verifikator.
 import { Button } from "@repo/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";
 import { Input } from "@repo/ui/components/input";
@@ -9,12 +8,13 @@ import { NativeSelect, NativeSelectOption } from "@repo/ui/components/native-sel
 import { toast } from "@repo/ui/components/sonner";
 import { Textarea } from "@repo/ui/components/textarea";
 import { cn } from "@repo/ui/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { seedPrograms } from "../programs/data";
-
-const insidentalPrograms = seedPrograms.filter((p) => p.type === "insidental" && p.active);
+import { useIntakeMutation } from "../cases/hooks";
+import { regionsQueryOptions } from "../pengaturan/services";
+import { programsQueryOptions } from "../programs/services";
 
 const initialForm = {
   nama: "",
@@ -43,7 +43,8 @@ const initialForm = {
   pelaporInstansi: "Perorangan",
   pelaporAlamat: "",
   pelaporTelp: "",
-  program: insidentalPrograms[0]?.name ?? "",
+  program: "",
+  wilayah: "",
 };
 
 type FormState = typeof initialForm;
@@ -53,6 +54,12 @@ export function PengajuanForm() {
   const [form, setForm] = useState<FormState>(initialForm);
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
+
+  const { data: programs = [] } = useQuery(
+    programsQueryOptions({ type: "insidental", active: true }),
+  );
+  const { data: regions = [] } = useQuery(regionsQueryOptions);
+  const intake = useIntakeMutation();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,8 +71,76 @@ export function PengajuanForm() {
       toast.error("NIK harus 16 digit.");
       return;
     }
-    toast.success(`Pengajuan untuk ${form.nama.trim()} berhasil dibuat.`);
-    navigate({ to: "/bantuan-insidental" });
+    const programId = programs.find((p) => p.name === form.program)?.id ?? programs[0]?.id;
+    if (!programId) {
+      toast.error("Program bantuan belum dipilih.");
+      return;
+    }
+    if (!form.alamat.trim()) {
+      toast.error("Alamat wajib diisi.");
+      return;
+    }
+    if (!form.masalah.trim()) {
+      toast.error("Masalah yang dihadapi wajib diisi.");
+      return;
+    }
+    if (!form.pelaporNama.trim()) {
+      toast.error("Nama pelapor wajib diisi.");
+      return;
+    }
+
+    intake.mutate(
+      {
+        applicant: {
+          name: form.nama.trim(),
+          nik: form.nik,
+          birthPlace: form.ttl,
+          birthDate: "",
+          age: Number(form.usia) || 0,
+          gender: form.gender as "Laki-laki" | "Perempuan",
+          maritalStatus: form.statusPernikahan as
+            | "Menikah"
+            | "Duda"
+            | "Janda"
+            | "Janda Mati"
+            | "Belum Menikah",
+          address: form.alamat.trim(),
+          housingStatus: form.statusTinggal as
+            | "Milik Sendiri"
+            | "Sewa/Kontrak"
+            | "Menumpang"
+            | "Tidak Memiliki",
+          job: form.pekerjaan,
+          incomeAmount: Number(form.penghasilan) || 0,
+          incomePeriod: form.periode as "per hari" | "per pekan" | "per bulan",
+          dependents: Number(form.tanggungan) || 0,
+          phone: form.noHp,
+          prayerStatus: form.sholat as "Ya" | "Jarang" | "Tidak",
+          smokingStatus: form.merokok as "Ya" | "Jarang" | "Tidak",
+          priorHelp: form.priorHelp,
+          publishConsent: form.publikasi === "Ya",
+          sktmStatus: form.sktm as "Belum ada" | "Bersedia mengurus" | "Sudah ada",
+          infoSource: form.asalInfo,
+          regionCity: form.wilayah || undefined,
+        },
+        reporter: {
+          name: form.pelaporNama.trim(),
+          relation: form.pelaporHubungan,
+          institution: form.pelaporInstansi,
+          address: form.pelaporAlamat,
+          phone: form.pelaporTelp,
+        },
+        programId,
+        problem: form.masalah.trim(),
+        priority: "normal",
+      },
+      {
+        onSuccess: (created) => {
+          toast.success(`Pengajuan ${created.caseNumber} untuk ${form.nama.trim()} dibuat.`);
+          navigate({ to: "/kasus/$caseId", params: { caseId: created.id } });
+        },
+      },
+    );
   };
 
   return (
@@ -159,6 +234,21 @@ export function PengajuanForm() {
                 rows={2}
                 value={form.alamat}
               />
+            </Field>
+            <Field htmlFor="wilayah" label="Wilayah (kota/kabupaten)">
+              <NativeSelect
+                className="w-full"
+                id="wilayah"
+                onChange={(e) => set("wilayah", e.target.value)}
+                value={form.wilayah}
+              >
+                <NativeSelectOption value="">Pilih wilayah indeks HK…</NativeSelectOption>
+                {regions.map((r) => (
+                  <NativeSelectOption key={r.id} value={r.city}>
+                    {r.city} — {r.province}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
             </Field>
             <Field htmlFor="statusTinggal" label="Status tempat tinggal">
               <Select
@@ -332,8 +422,8 @@ export function PengajuanForm() {
               <Select
                 id="program"
                 onChange={(v) => set("program", v)}
-                options={insidentalPrograms.map((p) => p.name)}
-                value={form.program}
+                options={programs.map((p) => p.name)}
+                value={form.program || (programs[0]?.name ?? "")}
               />
             </Field>
           </CardContent>
@@ -343,7 +433,9 @@ export function PengajuanForm() {
           <Button asChild type="button" variant="outline">
             <Link to="/bantuan-insidental">Batal</Link>
           </Button>
-          <Button type="submit">Simpan pengajuan</Button>
+          <Button disabled={intake.isPending} type="submit">
+            {intake.isPending ? "Menyimpan…" : "Simpan pengajuan"}
+          </Button>
         </div>
       </form>
     </div>

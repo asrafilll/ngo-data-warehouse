@@ -18,11 +18,25 @@ export async function loadAuthSession(c: Context<{ Variables: AuthVariables }>, 
 }
 
 export function requireAdmin(c: Context<{ Variables: AuthVariables }>) {
-  const user = c.get("user");
+  return requireRole(c, ["admin"]);
+}
 
-  if (!user?.role?.split(",").includes("admin")) {
+// SIP roles: super_admin | admin | pengurus | verifikator. super_admin passes every
+// guard. `role` is better-auth's comma-separated string.
+export function requireRole(c: Context<{ Variables: AuthVariables }>, roles: string[]) {
+  const user = c.get("user");
+  const userRoles = user?.role?.split(",") ?? [];
+
+  if (
+    !user ||
+    (!userRoles.includes("super_admin") && !roles.some((role) => userRoles.includes(role)))
+  ) {
     return null;
   }
 
   return user;
+}
+
+export function requireUser(c: Context<{ Variables: AuthVariables }>) {
+  return c.get("user");
 }

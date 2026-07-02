@@ -3,6 +3,15 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./modules/auth/auth";
 import { type AuthVariables, loadAuthSession } from "./modules/auth/middleware";
+import { casesRouter } from "./modules/cases/router";
+import { donorsRouter } from "./modules/donors/router";
+import { mustahikRouter } from "./modules/mustahik/router";
+import { programsRouter } from "./modules/programs/router";
+import { regionsRouter } from "./modules/regions/router";
+import { reportsRouter } from "./modules/reports/router";
+import { rutinRouter } from "./modules/rutin/router";
+import { settingsRouter } from "./modules/settings/router";
+import { uploadsRouter } from "./modules/uploads/router";
 import { usersRouter } from "./modules/users/router";
 
 export const app = new Hono<{ Variables: AuthVariables }>()
@@ -32,6 +41,15 @@ export const app = new Hono<{ Variables: AuthVariables }>()
   .on(["POST", "GET"], "/api/auth/*", (c) => {
     return auth.handler(c.req.raw);
   })
-  .route("/users", usersRouter);
+  .route("/users", usersRouter)
+  .route("/programs", programsRouter)
+  .route("/regions", regionsRouter)
+  .route("/settings", settingsRouter)
+  .route("/mustahik", mustahikRouter)
+  .route("/cases", casesRouter)
+  .route("/rutin", rutinRouter)
+  .route("/donors", donorsRouter)
+  .route("/reports", reportsRouter)
+  .route("/uploads", uploadsRouter);
 
 export type AppType = typeof app;

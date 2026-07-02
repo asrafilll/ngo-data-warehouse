@@ -1,6 +1,7 @@
-// Mustahik — master profile of penerima manfaat, derived from the caseload (unique by
-// NIK). Search + filter; a row opens the person's most recent case. Mock data.
-import { aidCases, formatCurrency, type AidCase, type Applicant } from "@repo/sip-domain";
+// Mustahik — master profile of penerima manfaat (unique by NIK), API-backed with
+// server-side search + pagination. A row opens the person's most recent case.
+import { formatDate, statusLabels } from "@repo/sip-domain";
+import { Badge } from "@repo/ui/components/badge";
 import { Input } from "@repo/ui/components/input";
 import { NativeSelect, NativeSelectOption } from "@repo/ui/components/native-select";
 import {
@@ -11,38 +12,12 @@ import {
   TableHeader,
   TableRow,
 } from "@repo/ui/components/table";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { Search } from "lucide-react";
-import { useMemo, useState } from "react";
-import { TablePagination, paginate } from "../../components/pagination";
-
-type MustahikEntry = {
-  applicant: Applicant;
-  region: string;
-  cases: AidCase[];
-  totalRecommended: number;
-};
-
-const mustahikList: MustahikEntry[] = (() => {
-  const byNik = new Map<string, MustahikEntry>();
-  for (const c of aidCases) {
-    const key = c.applicant.nik;
-    const entry =
-      byNik.get(key) ??
-      ({
-        applicant: c.applicant,
-        region: c.hadKifayah.region,
-        cases: [],
-        totalRecommended: 0,
-      } satisfies MustahikEntry);
-    entry.cases.push(c);
-    entry.totalRecommended += c.hadKifayah.recommendedAid;
-    byNik.set(key, entry);
-  }
-  return [...byNik.values()].sort((a, b) => a.applicant.name.localeCompare(b.applicant.name));
-})();
-
-const regions = [...new Set(mustahikList.map((m) => m.region))];
+import { useState } from "react";
+import { TablePagination } from "../../components/pagination";
+import { mustahikQueryOptions } from "./services";
 
 export function MustahikList({
   page,
@@ -53,22 +28,23 @@ export function MustahikList({
 }) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const [region, setRegion] = useState("all");
+  const [kind, setKind] = useState<"all" | "true" | "false">("all");
   const resetPage = () => onPageChange(1);
 
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return mustahikList.filter((m) => {
-      if (region !== "all" && m.region !== region) return false;
-      if (!q) return true;
-      return (
-        m.applicant.name.toLowerCase().includes(q) ||
-        m.applicant.nik.includes(q) ||
-        m.region.toLowerCase().includes(q)
-      );
-    });
-  }, [query, region]);
-  const paged = paginate(rows, page);
+  const { data, isPending } = useQuery(
+    mustahikQueryOptions({
+      q: query.trim() || undefined,
+      isRutin: kind === "all" ? undefined : kind,
+      page,
+    }),
+  );
+
+  const rows = data?.rows ?? [];
+  const total = data?.total ?? 0;
+  const perPage = data?.perPage ?? 10;
+  const pageCount = Math.max(1, Math.ceil(total / perPage));
+  const from = total === 0 ? 0 : (page - 1) * perPage + 1;
+  const to = Math.min(page * perPage, total);
 
   return (
     <div className="mx-auto grid max-w-[1440px] gap-6">
@@ -91,24 +67,21 @@ export function MustahikList({
                 setQuery(e.target.value);
                 resetPage();
               }}
-              placeholder="Cari nama, NIK, atau wilayah"
+              placeholder="Cari nama, NIK, atau alamat"
               value={query}
             />
           </div>
           <NativeSelect
             onChange={(e) => {
-              setRegion(e.target.value);
+              setKind(e.target.value as typeof kind);
               resetPage();
             }}
             size="sm"
-            value={region}
+            value={kind}
           >
-            <NativeSelectOption value="all">Semua wilayah</NativeSelectOption>
-            {regions.map((r) => (
-              <NativeSelectOption key={r} value={r}>
-                {r}
-              </NativeSelectOption>
-            ))}
+            <NativeSelectOption value="all">Semua jenis</NativeSelectOption>
+            <NativeSelectOption value="false">Insidental</NativeSelectOption>
+            <NativeSelectOption value="true">Binaan rutin</NativeSelectOption>
           </NativeSelect>
         </div>
 
@@ -121,46 +94,56 @@ export function MustahikList({
               <TableHead>Usia / JK</TableHead>
               <TableHead>Tanggungan</TableHead>
               <TableHead>Riwayat</TableHead>
-              <TableHead className="pr-4 text-right">Total rekomendasi</TableHead>
+              <TableHead className="pr-4">Kasus terakhir</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell className="py-12 text-center text-muted-foreground text-sm" colSpan={7}>
-                  Tidak ada mustahik yang cocok.
+                  {isPending ? "Memuat mustahik…" : "Tidak ada mustahik yang cocok."}
                 </TableCell>
               </TableRow>
             ) : (
-              paged.pageRows.map((m) => {
-                const latest = m.cases[m.cases.length - 1];
+              rows.map((m) => {
+                const latest = m.cases[0];
                 return (
                   <TableRow
-                    className="cursor-pointer"
-                    key={m.applicant.nik}
+                    className={latest ? "cursor-pointer" : undefined}
+                    key={m.id}
                     onClick={() =>
-                      navigate({ to: "/kasus/$caseId", params: { caseId: latest.id } })
+                      latest && navigate({ to: "/kasus/$caseId", params: { caseId: latest.id } })
                     }
                   >
                     <TableCell className="pl-4">
                       <div className="grid gap-0.5">
-                        <span className="font-medium">{m.applicant.name}</span>
+                        <span className="flex items-center gap-2 font-medium">
+                          {m.name}
+                          {m.isRutin ? <Badge variant="secondary">Rutin</Badge> : null}
+                        </span>
                         <span className="max-w-[260px] truncate text-muted-foreground text-xs">
-                          {m.applicant.address}
+                          {m.address}
                         </span>
                       </div>
                     </TableCell>
                     <TableCell className="font-mono text-muted-foreground text-xs">
-                      {m.applicant.nik}
+                      {m.nik}
                     </TableCell>
-                    <TableCell className="text-sm">{m.region}</TableCell>
+                    <TableCell className="text-sm">{m.region?.city ?? "—"}</TableCell>
                     <TableCell className="text-sm">
-                      {m.applicant.age} · {m.applicant.gender === "Perempuan" ? "P" : "L"}
+                      {m.age} · {m.gender === "Perempuan" ? "P" : "L"}
                     </TableCell>
-                    <TableCell className="text-sm tabular-nums">{m.applicant.dependents}</TableCell>
-                    <TableCell className="text-sm">{m.cases.length} bantuan</TableCell>
-                    <TableCell className="pr-4 text-right font-medium tabular-nums">
-                      {formatCurrency(m.totalRecommended)}
+                    <TableCell className="text-sm tabular-nums">{m.dependents}</TableCell>
+                    <TableCell className="text-sm">
+                      {m._count.cases} kasus
+                      {m._count.rutinBeneficiaries > 0
+                        ? ` · ${m._count.rutinBeneficiaries} rutin`
+                        : ""}
+                    </TableCell>
+                    <TableCell className="pr-4 text-sm">
+                      {latest
+                        ? `${latest.program.name} · ${statusLabels[latest.status]} · ${formatDate(latest.submittedAt)}`
+                        : "—"}
                     </TableCell>
                   </TableRow>
                 );
@@ -170,13 +153,13 @@ export function MustahikList({
         </Table>
 
         <TablePagination
-          from={paged.from}
+          from={from}
           label="mustahik"
           onPageChange={onPageChange}
-          page={paged.page}
-          pageCount={paged.pageCount}
-          to={paged.to}
-          total={paged.total}
+          page={page}
+          pageCount={pageCount}
+          to={to}
+          total={total}
         />
       </div>
     </div>

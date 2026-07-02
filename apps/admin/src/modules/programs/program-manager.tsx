@@ -1,5 +1,5 @@
-// Program — CRUD over the program master (in-memory mock, no backend). Each program is
-// typed insidental or rutin; rutin programs carry a default monthly nominal.
+// Program — CRUD over the program master, API-backed. Each program is typed insidental
+// or rutin; rutin programs carry a default monthly nominal.
 import { formatCurrency } from "@repo/sip-domain";
 import {
   AlertDialog,
@@ -36,10 +36,17 @@ import {
 } from "@repo/ui/components/table";
 import { Textarea } from "@repo/ui/components/textarea";
 import { cn } from "@repo/ui/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { TablePagination, paginate } from "../../components/pagination";
-import { type Program, type ProgramType, programTypeLabels, seedPrograms } from "./data";
+import {
+  programsQueryOptions,
+  programTypeLabels,
+  useProgramMutations,
+  type Program,
+  type ProgramType,
+} from "./services";
 
 type Draft = {
   name: string;
@@ -64,12 +71,14 @@ export function ProgramManager({
   page: number;
   onPageChange: (next: number) => void;
 }) {
-  const [programs, setPrograms] = useState<Program[]>(seedPrograms);
   const [typeFilter, setTypeFilter] = useState<ProgramType | "all">("all");
   const [editing, setEditing] = useState<Program | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Program | null>(null);
   const resetPage = () => onPageChange(1);
+
+  const { data: programs = [] } = useQuery(programsQueryOptions());
+  const { create, update, remove } = useProgramMutations();
 
   const rows = useMemo(
     () => (typeFilter === "all" ? programs : programs.filter((p) => p.type === typeFilter)),
@@ -88,46 +97,46 @@ export function ProgramManager({
 
   const handleSave = (draft: Draft) => {
     const nominal =
-      draft.type === "rutin" && draft.defaultNominal ? Number(draft.defaultNominal) : undefined;
+      draft.type === "rutin" && draft.defaultNominal ? Number(draft.defaultNominal) : null;
+    const input = {
+      name: draft.name,
+      type: draft.type,
+      description: draft.description,
+      active: draft.active,
+      defaultNominal: nominal,
+    };
     if (editing) {
-      setPrograms((prev) =>
-        prev.map((p) =>
-          p.id === editing.id
-            ? {
-                ...p,
-                name: draft.name,
-                type: draft.type,
-                description: draft.description,
-                active: draft.active,
-                defaultNominal: nominal,
-              }
-            : p,
-        ),
-      );
-      toast.success(`Program "${draft.name}" diperbarui.`);
-    } else {
-      const id = `prg-${draft.name.toLowerCase().replace(/\s+/g, "-")}-${Date.now().toString(36)}`;
-      setPrograms((prev) => [
+      update.mutate(
+        { id: editing.id, ...input },
         {
-          id,
-          name: draft.name,
-          type: draft.type,
-          description: draft.description,
-          active: draft.active,
-          defaultNominal: nominal,
+          onSuccess: () => {
+            toast.success(`Program "${draft.name}" diperbarui.`);
+            setDialogOpen(false);
+          },
         },
-        ...prev,
-      ]);
-      toast.success(`Program "${draft.name}" ditambahkan.`);
-      resetPage();
+      );
+    } else {
+      create.mutate(input, {
+        onSuccess: () => {
+          toast.success(`Program "${draft.name}" ditambahkan.`);
+          resetPage();
+          setDialogOpen(false);
+        },
+      });
     }
-    setDialogOpen(false);
   };
 
   const confirmDelete = () => {
     if (!deleteTarget) return;
-    setPrograms((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-    toast.success(`Program "${deleteTarget.name}" dihapus.`);
+    remove.mutate(deleteTarget.id, {
+      onSuccess: (result) => {
+        toast.success(
+          result.deleted
+            ? `Program "${deleteTarget.name}" dihapus.`
+            : `Program "${deleteTarget.name}" dinonaktifkan (masih dipakai riwayat kasus).`,
+        );
+      },
+    });
     setDeleteTarget(null);
   };
 

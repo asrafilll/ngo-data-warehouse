@@ -1,6 +1,6 @@
-// Bantuan Rutin — standing roster detail. Pick a rutin program + period (bulan); the
-// roster carries over each month and you settle/adjust a few rows. In-memory mock, no
-// backend. Disbursement status is per program + period.
+// Bantuan Rutin — standing roster detail, API-backed. Pick a rutin program + period
+// (bulan); the roster carries over each month and you settle/adjust a few rows.
+// Disbursement status is per beneficiary + period.
 import { formatCurrency } from "@repo/sip-domain";
 import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
@@ -25,16 +25,14 @@ import {
   TableRow,
 } from "@repo/ui/components/table";
 import { cn } from "@repo/ui/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Plus, Wallet } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { TablePagination, paginate } from "../../components/pagination";
-import {
-  type RutinBeneficiary,
-  periods,
-  rutinBeneficiaries,
-  rutinPrograms,
-  seedDisbursed,
-} from "./data";
+import { programsQueryOptions } from "../programs/services";
+import { buildPeriods, rosterQueryOptions, useRutinMutations } from "./services";
+
+const periods = buildPeriods();
 
 function formatMonth(iso: string) {
   return new Intl.DateTimeFormat("id-ID", { month: "short", year: "numeric" }).format(
@@ -49,74 +47,26 @@ export function RutinRoster({
   page: number;
   onPageChange: (next: number) => void;
 }) {
-  const [beneficiaries, setBeneficiaries] = useState<RutinBeneficiary[]>(rutinBeneficiaries);
-  const [programId, setProgramId] = useState(rutinPrograms[0]?.id ?? "");
+  const { data: rutinPrograms = [] } = useQuery(programsQueryOptions({ type: "rutin" }));
+  const [programId, setProgramId] = useState("");
   const [periodKey, setPeriodKey] = useState(periods[0].key);
-  // Disbursed sets keyed by `${programId}:${periodKey}`; lazily seeded on first access.
-  const [disbursedMap, setDisbursedMap] = useState<Record<string, string[]>>({});
   const [addOpen, setAddOpen] = useState(false);
   const resetPage = () => onPageChange(1);
 
+  // Default to the first rutin program once loaded.
+  useEffect(() => {
+    if (!programId && rutinPrograms.length > 0) setProgramId(rutinPrograms[0].id);
+  }, [programId, rutinPrograms]);
+
   const program = rutinPrograms.find((p) => p.id === programId);
-  const mapKey = `${programId}:${periodKey}`;
+  const { data: roster = [] } = useQuery(rosterQueryOptions(programId, periodKey));
+  const { add, toggle, disburseAll } = useRutinMutations(programId, periodKey);
 
-  const roster = useMemo(
-    () => beneficiaries.filter((b) => b.programId === programId && b.since <= periodKey),
-    [beneficiaries, programId, periodKey],
-  );
   const paged = paginate(roster, page);
-
-  const disbursed = useMemo(() => {
-    const stored = disbursedMap[mapKey];
-    return new Set(stored ?? [...seedDisbursed(periodKey, roster)]);
-  }, [disbursedMap, mapKey, periodKey, roster]);
-
-  const commit = (next: Set<string>) =>
-    setDisbursedMap((prev) => ({ ...prev, [mapKey]: [...next] }));
-
-  const toggle = (id: string) => {
-    const next = new Set(disbursed);
-    if (next.has(id)) {
-      next.delete(id);
-    } else {
-      next.add(id);
-    }
-    commit(next);
-  };
-
-  const disburseAll = () => {
-    commit(new Set(roster.map((b) => b.id)));
-    toast.success(`Semua penerima ${program?.name} untuk periode ini ditandai tersalur.`);
-  };
-
+  const disbursedRows = roster.filter((b) => b.disbursed);
   const totalNominal = roster.reduce((t, b) => t + b.nominal, 0);
-  const disbursedNominal = roster
-    .filter((b) => disbursed.has(b.id))
-    .reduce((t, b) => t + b.nominal, 0);
-  const allDone = roster.length > 0 && disbursed.size >= roster.length;
-
-  const addBeneficiary = (draft: {
-    name: string;
-    region: string;
-    nik: string;
-    nominal: number;
-  }) => {
-    const id = `rb-${Date.now().toString(36)}`;
-    setBeneficiaries((prev) => [
-      {
-        id,
-        programId,
-        name: draft.name,
-        region: draft.region,
-        nik: draft.nik,
-        nominal: draft.nominal,
-        since: periodKey,
-      },
-      ...prev,
-    ]);
-    toast.success(`${draft.name} ditambahkan ke roster ${program?.name}.`);
-    setAddOpen(false);
-  };
+  const disbursedNominal = disbursedRows.reduce((t, b) => t + b.nominal, 0);
+  const allDone = roster.length > 0 && disbursedRows.length >= roster.length;
 
   return (
     <div className="mx-auto grid max-w-[1440px] gap-6">
@@ -133,7 +83,18 @@ export function RutinRoster({
             <Plus className="size-4" strokeWidth={1.8} />
             Tambah penerima
           </Button>
-          <Button disabled={allDone || roster.length === 0} onClick={disburseAll} type="button">
+          <Button
+            disabled={allDone || roster.length === 0 || disburseAll.isPending}
+            onClick={() =>
+              disburseAll.mutate(undefined, {
+                onSuccess: () =>
+                  toast.success(
+                    `Semua penerima ${program?.name} untuk periode ini ditandai tersalur.`,
+                  ),
+              })
+            }
+            type="button"
+          >
             <Wallet className="size-4" strokeWidth={1.8} />
             Salurkan semua
           </Button>
@@ -180,9 +141,11 @@ export function RutinRoster({
         />
         <Stat
           label="Tersalur"
-          value={`${disbursed.size} / ${roster.length}`}
+          value={`${disbursedRows.length} / ${roster.length}`}
           sub={
-            roster.length ? `${Math.round((disbursed.size / roster.length) * 100)}% selesai` : "—"
+            roster.length
+              ? `${Math.round((disbursedRows.length / roster.length) * 100)}% selesai`
+              : "—"
           }
         />
         <Stat
@@ -226,54 +189,52 @@ export function RutinRoster({
                 </TableCell>
               </TableRow>
             ) : (
-              paged.pageRows.map((b) => {
-                const done = disbursed.has(b.id);
-                return (
-                  <TableRow key={b.id}>
-                    <TableCell className="pl-4">
-                      <div className="grid gap-0.5">
-                        <span className="font-medium">{b.name}</span>
-                        <span className="text-muted-foreground text-xs">{b.region}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-mono text-muted-foreground text-xs">
-                      {b.nik}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {formatMonth(b.since)}
-                    </TableCell>
-                    <TableCell className="text-sm tabular-nums">
-                      {formatCurrency(b.nominal)}
-                    </TableCell>
-                    <TableCell>
+              paged.pageRows.map((b) => (
+                <TableRow key={b.id}>
+                  <TableCell className="pl-4">
+                    <div className="grid gap-0.5">
+                      <span className="font-medium">{b.name}</span>
+                      <span className="text-muted-foreground text-xs">{b.region}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="font-mono text-muted-foreground text-xs">{b.nik}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {formatMonth(b.since)}
+                  </TableCell>
+                  <TableCell className="text-sm tabular-nums">
+                    {formatCurrency(b.nominal)}
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 text-sm",
+                        b.disbursed ? "text-primary" : "text-muted-foreground",
+                      )}
+                    >
                       <span
                         className={cn(
-                          "inline-flex items-center gap-1.5 text-sm",
-                          done ? "text-primary" : "text-muted-foreground",
+                          "size-2 rounded-full",
+                          b.disbursed ? "bg-primary" : "bg-muted-foreground/40",
                         )}
-                      >
-                        <span
-                          className={cn(
-                            "size-2 rounded-full",
-                            done ? "bg-primary" : "bg-muted-foreground/40",
-                          )}
-                        />
-                        {done ? "Tersalur" : "Belum"}
-                      </span>
-                    </TableCell>
-                    <TableCell className="pr-4 text-right">
-                      <Button
-                        onClick={() => toggle(b.id)}
-                        size="sm"
-                        type="button"
-                        variant={done ? "ghost" : "outline"}
-                      >
-                        {done ? "Batalkan" : "Tandai tersalur"}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+                      />
+                      {b.disbursed ? "Tersalur" : "Belum"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="pr-4 text-right">
+                    <Button
+                      disabled={toggle.isPending}
+                      onClick={() =>
+                        toggle.mutate({ beneficiaryId: b.id, disbursed: !b.disbursed })
+                      }
+                      size="sm"
+                      type="button"
+                      variant={b.disbursed ? "ghost" : "outline"}
+                    >
+                      {b.disbursed ? "Batalkan" : "Tandai tersalur"}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
           </TableBody>
         </Table>
@@ -292,7 +253,14 @@ export function RutinRoster({
       <AddBeneficiaryDialog
         defaultNominal={program?.defaultNominal ?? 0}
         onOpenChange={setAddOpen}
-        onSave={addBeneficiary}
+        onSave={(draft) =>
+          add.mutate(draft, {
+            onSuccess: () => {
+              toast.success(`${draft.name} ditambahkan ke roster ${program?.name}.`);
+              setAddOpen(false);
+            },
+          })
+        }
         open={addOpen}
         programName={program?.name ?? ""}
       />
@@ -341,11 +309,19 @@ function AddBeneficiaryDialog({
       toast.error("Nama penerima wajib diisi.");
       return;
     }
+    if (nik.length !== 16) {
+      toast.error("NIK harus 16 digit.");
+      return;
+    }
+    if (!Number(nominal)) {
+      toast.error("Nominal wajib diisi.");
+      return;
+    }
     onSave({
       name: name.trim(),
       region: region.trim(),
       nik: nik.trim(),
-      nominal: Number(nominal) || 0,
+      nominal: Number(nominal),
     });
     reset();
   };
@@ -399,6 +375,7 @@ function AddBeneficiaryDialog({
             <Input
               id="b-nik"
               inputMode="numeric"
+              maxLength={16}
               onChange={(e) => setNik(e.target.value.replace(/\D/g, ""))}
               placeholder="16 digit"
               value={nik}

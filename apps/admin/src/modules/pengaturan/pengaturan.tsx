@@ -1,17 +1,20 @@
 // Pengaturan — org profile, users/amil, Had Kifayah regional index master, and
-// preferences. Tabbed. Mock/in-memory (no backend).
-import {
-  formatCurrency,
-  formatDate,
-  regionalIndexes,
-  sipUsers,
-  type SipRole,
-} from "@repo/sip-domain";
+// preferences. Tabbed, fully API-backed.
+import { formatCurrency, formatDate } from "@repo/sip-domain";
 import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@repo/ui/components/dialog";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
+import { NativeSelect, NativeSelectOption } from "@repo/ui/components/native-select";
 import { Switch } from "@repo/ui/components/switch";
 import { toast } from "@repo/ui/components/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@repo/ui/components/tabs";
@@ -24,15 +27,19 @@ import {
   TableRow,
 } from "@repo/ui/components/table";
 import { cn } from "@repo/ui/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
-import { useState } from "react";
-
-const roleLabels: Record<SipRole, string> = {
-  super_admin: "Super Admin",
-  admin: "Admin",
-  pengurus: "Pengurus",
-  verifikator: "Verifikator",
-};
+import { useEffect, useState } from "react";
+import {
+  regionsQueryOptions,
+  roleLabels,
+  settingsQueryOptions,
+  useAmilMutations,
+  useRegionMutations,
+  useSettingsMutation,
+  usersQueryOptions,
+  type SipRole,
+} from "./services";
 
 export function Pengaturan() {
   return (
@@ -70,14 +77,22 @@ export function Pengaturan() {
 }
 
 function LembagaTab() {
-  const [form, setForm] = useState({
-    nama: "Solidaritas Insan Peduli",
-    singkatan: "SIP",
-    email: "sekretariat@sip.or.id",
-    telp: "021-1234-5678",
-    alamat: "Jl. Contoh No. 10, Bekasi, Jawa Barat",
-  });
+  const { data: settings } = useQuery(settingsQueryOptions);
+  const mutation = useSettingsMutation();
+  const [form, setForm] = useState({ name: "", legalName: "", email: "", phone: "", address: "" });
   const set = (k: keyof typeof form, v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  useEffect(() => {
+    if (settings) {
+      setForm({
+        name: settings.name,
+        legalName: settings.legalName,
+        email: settings.email,
+        phone: settings.phone,
+        address: settings.address,
+      });
+    }
+  }, [settings]);
 
   return (
     <Card>
@@ -87,19 +102,19 @@ function LembagaTab() {
       <CardContent className="grid max-w-2xl gap-4 sm:grid-cols-2">
         <div className="grid gap-2 sm:col-span-2">
           <Label htmlFor="nama">Nama lembaga</Label>
-          <Input id="nama" onChange={(e) => set("nama", e.target.value)} value={form.nama} />
+          <Input id="nama" onChange={(e) => set("name", e.target.value)} value={form.name} />
         </div>
         <div className="grid gap-2">
-          <Label htmlFor="singkatan">Singkatan</Label>
+          <Label htmlFor="legal">Nama resmi / yayasan</Label>
           <Input
-            id="singkatan"
-            onChange={(e) => set("singkatan", e.target.value)}
-            value={form.singkatan}
+            id="legal"
+            onChange={(e) => set("legalName", e.target.value)}
+            value={form.legalName}
           />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="telp">Telepon</Label>
-          <Input id="telp" onChange={(e) => set("telp", e.target.value)} value={form.telp} />
+          <Input id="telp" onChange={(e) => set("phone", e.target.value)} value={form.phone} />
         </div>
         <div className="grid gap-2 sm:col-span-2">
           <Label htmlFor="email">Email</Label>
@@ -112,10 +127,22 @@ function LembagaTab() {
         </div>
         <div className="grid gap-2 sm:col-span-2">
           <Label htmlFor="alamat">Alamat</Label>
-          <Input id="alamat" onChange={(e) => set("alamat", e.target.value)} value={form.alamat} />
+          <Input
+            id="alamat"
+            onChange={(e) => set("address", e.target.value)}
+            value={form.address}
+          />
         </div>
         <div className="sm:col-span-2">
-          <Button onClick={() => toast.success("Profil lembaga disimpan.")} type="button">
+          <Button
+            disabled={mutation.isPending}
+            onClick={() =>
+              mutation.mutate(form, {
+                onSuccess: () => toast.success("Profil lembaga disimpan."),
+              })
+            }
+            type="button"
+          >
             Simpan perubahan
           </Button>
         </div>
@@ -125,11 +152,15 @@ function LembagaTab() {
 }
 
 function PenggunaTab() {
+  const { data: users = [] } = useQuery(usersQueryOptions());
+  const { create, update } = useAmilMutations();
+  const [addOpen, setAddOpen] = useState(false);
+
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
         <CardTitle>Pengguna & Amil</CardTitle>
-        <Button onClick={() => toast("Tambah pengguna (mock).")} size="sm" type="button">
+        <Button onClick={() => setAddOpen(true)} size="sm" type="button">
           <Plus className="size-4" strokeWidth={1.8} />
           Tambah pengguna
         </Button>
@@ -142,44 +173,209 @@ function PenggunaTab() {
               <TableHead>Peran</TableHead>
               <TableHead>Wilayah</TableHead>
               <TableHead>No. HP</TableHead>
-              <TableHead className="pr-6">Status</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="pr-6 text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sipUsers.map((u) => (
+            {users.map((u) => (
               <TableRow key={u.id}>
-                <TableCell className="pl-6 font-medium">{u.name}</TableCell>
-                <TableCell>
-                  <Badge variant="secondary">{roleLabels[u.role]}</Badge>
+                <TableCell className="pl-6">
+                  <div className="grid gap-0.5">
+                    <span className="font-medium">{u.name}</span>
+                    <span className="text-muted-foreground text-xs">{u.email}</span>
+                  </div>
                 </TableCell>
-                <TableCell className="text-sm">{u.region}</TableCell>
-                <TableCell className="text-muted-foreground text-sm">{u.phone}</TableCell>
-                <TableCell className="pr-6">
+                <TableCell>
+                  <Badge variant="secondary">
+                    {roleLabels[(u.role as SipRole) ?? "admin"] ?? u.role}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-sm">{u.region ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground text-sm">{u.phone ?? "—"}</TableCell>
+                <TableCell>
                   <span className="inline-flex items-center gap-1.5 text-sm">
                     <span
                       className={cn(
                         "size-2 rounded-full",
-                        u.status === "Aktif" ? "bg-primary" : "bg-muted-foreground/40",
+                        u.active ? "bg-primary" : "bg-muted-foreground/40",
                       )}
                     />
-                    {u.status}
+                    {u.active ? "Aktif" : "Nonaktif"}
                   </span>
+                </TableCell>
+                <TableCell className="pr-6 text-right">
+                  <Button
+                    disabled={update.isPending}
+                    onClick={() =>
+                      update.mutate(
+                        { id: u.id, active: !u.active },
+                        {
+                          onSuccess: () =>
+                            toast.success(
+                              `${u.name} ${u.active ? "dinonaktifkan" : "diaktifkan"}.`,
+                            ),
+                        },
+                      )
+                    }
+                    size="sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    {u.active ? "Nonaktifkan" : "Aktifkan"}
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </CardContent>
+
+      <AddUserDialog
+        onOpenChange={setAddOpen}
+        onSave={(input) =>
+          create.mutate(input, {
+            onSuccess: () => {
+              toast.success(`Pengguna ${input.name} ditambahkan.`);
+              setAddOpen(false);
+            },
+          })
+        }
+        open={addOpen}
+        pending={create.isPending}
+      />
     </Card>
   );
 }
 
+function AddUserDialog({
+  open,
+  onOpenChange,
+  onSave,
+  pending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (input: {
+    name: string;
+    email: string;
+    password: string;
+    role: SipRole;
+    phone: string;
+    region: string;
+  }) => void;
+  pending: boolean;
+}) {
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "verifikator" as SipRole,
+    phone: "",
+    region: "",
+  });
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
+    setForm((p) => ({ ...p, [k]: v }));
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.email.trim()) {
+      toast.error("Nama dan email wajib diisi.");
+      return;
+    }
+    if (form.password.length < 8) {
+      toast.error("Password minimal 8 karakter.");
+      return;
+    }
+    onSave(form);
+  };
+
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Tambah pengguna</DialogTitle>
+          <DialogDescription>Akun amil baru dengan peran SIP.</DialogDescription>
+        </DialogHeader>
+        <form className="grid gap-4" id="add-user-form" onSubmit={handleSubmit}>
+          <div className="grid gap-2">
+            <Label htmlFor="u-name">Nama</Label>
+            <Input id="u-name" onChange={(e) => set("name", e.target.value)} value={form.name} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-2">
+              <Label htmlFor="u-email">Email</Label>
+              <Input
+                id="u-email"
+                onChange={(e) => set("email", e.target.value)}
+                type="email"
+                value={form.email}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="u-password">Password</Label>
+              <Input
+                id="u-password"
+                onChange={(e) => set("password", e.target.value)}
+                type="password"
+                value={form.password}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-2">
+              <Label htmlFor="u-role">Peran</Label>
+              <NativeSelect
+                className="w-full"
+                id="u-role"
+                onChange={(e) => set("role", e.target.value as SipRole)}
+                value={form.role}
+              >
+                {(Object.entries(roleLabels) as Array<[SipRole, string]>).map(([value, label]) => (
+                  <NativeSelectOption key={value} value={value}>
+                    {label}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelect>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="u-region">Wilayah tugas</Label>
+              <Input
+                id="u-region"
+                onChange={(e) => set("region", e.target.value)}
+                placeholder="mis. Bekasi"
+                value={form.region}
+              />
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="u-phone">No. HP</Label>
+            <Input id="u-phone" onChange={(e) => set("phone", e.target.value)} value={form.phone} />
+          </div>
+        </form>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
+            Batal
+          </Button>
+          <Button disabled={pending} form="add-user-form" type="submit">
+            Tambah
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function WilayahTab() {
+  const { data: regions = [] } = useQuery(regionsQueryOptions);
+  const { create } = useRegionMutations();
+  const [addOpen, setAddOpen] = useState(false);
+
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between">
         <CardTitle>Indeks Had Kifayah Wilayah</CardTitle>
-        <Button onClick={() => toast("Tambah wilayah (mock).")} size="sm" type="button">
+        <Button onClick={() => setAddOpen(true)} size="sm" type="button">
           <Plus className="size-4" strokeWidth={1.8} />
           Tambah wilayah
         </Button>
@@ -197,7 +393,7 @@ function WilayahTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {regionalIndexes.map((r) => (
+            {regions.map((r) => (
               <TableRow key={r.id}>
                 <TableCell className="pl-6 font-medium">{r.city}</TableCell>
                 <TableCell className="text-sm">{r.province}</TableCell>
@@ -218,44 +414,171 @@ function WilayahTab() {
           </TableBody>
         </Table>
       </CardContent>
+
+      <AddRegionDialog
+        onOpenChange={setAddOpen}
+        onSave={(input) =>
+          create.mutate(input, {
+            onSuccess: () => {
+              toast.success(`Wilayah ${input.city} ditambahkan.`);
+              setAddOpen(false);
+            },
+          })
+        }
+        open={addOpen}
+        pending={create.isPending}
+      />
     </Card>
   );
 }
 
-function PreferensiTab() {
-  const [prefs, setPrefs] = useState({
-    webp: true,
-    encrypt: true,
-    notifyDecision: true,
-    offline: false,
+function AddRegionDialog({
+  open,
+  onOpenChange,
+  onSave,
+  pending,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (input: {
+    province: string;
+    city: string;
+    familyMonthlyNeed: number;
+    perCapitaNeed: number;
+    foodIndex: number;
+  }) => void;
+  pending: boolean;
+}) {
+  const [form, setForm] = useState({
+    province: "",
+    city: "",
+    familyMonthlyNeed: "",
+    perCapitaNeed: "",
+    foodIndex: "1.00",
   });
-  const toggle = (k: keyof typeof prefs) => (v: boolean) => {
-    setPrefs((p) => ({ ...p, [k]: v }));
-    toast.success("Preferensi diperbarui.");
+  const set = (k: keyof typeof form, v: string) => setForm((p) => ({ ...p, [k]: v }));
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.city.trim() || !form.province.trim()) {
+      toast.error("Kota dan provinsi wajib diisi.");
+      return;
+    }
+    if (!Number(form.familyMonthlyNeed) || !Number(form.perCapitaNeed)) {
+      toast.error("Nilai kebutuhan wajib diisi.");
+      return;
+    }
+    onSave({
+      province: form.province.trim(),
+      city: form.city.trim(),
+      familyMonthlyNeed: Number(form.familyMonthlyNeed),
+      perCapitaNeed: Number(form.perCapitaNeed),
+      foodIndex: Number(form.foodIndex) || 1,
+    });
   };
 
-  const items: Array<{ key: keyof typeof prefs; title: string; desc: string }> = [
-    {
-      key: "webp",
-      title: "Konversi WebP otomatis",
-      desc: "Kompres & konversi foto unggahan ke WebP di sisi klien.",
-    },
-    {
-      key: "encrypt",
-      title: "Enkripsi dokumen sensitif",
-      desc: "Enkripsi AES-256 untuk arsip KTP, KK, dan SKTM.",
-    },
-    {
-      key: "notifyDecision",
-      title: "Notifikasi keputusan",
-      desc: "Kirim notifikasi saat pengurus menetapkan nominal.",
-    },
-    {
-      key: "offline",
-      title: "Mode offline verifikator",
-      desc: "Izinkan Formulir 2 diisi offline lalu sinkron otomatis.",
-    },
-  ];
+  return (
+    <Dialog onOpenChange={onOpenChange} open={open}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Tambah wilayah</DialogTitle>
+          <DialogDescription>Indeks biaya hidup untuk kalkulasi Had Kifayah.</DialogDescription>
+        </DialogHeader>
+        <form className="grid gap-4" id="add-region-form" onSubmit={handleSubmit}>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-2">
+              <Label htmlFor="r-city">Kota / kabupaten</Label>
+              <Input id="r-city" onChange={(e) => set("city", e.target.value)} value={form.city} />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="r-province">Provinsi</Label>
+              <Input
+                id="r-province"
+                onChange={(e) => set("province", e.target.value)}
+                value={form.province}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="grid gap-2">
+              <Label htmlFor="r-family">Kebutuhan keluarga / bln</Label>
+              <Input
+                id="r-family"
+                inputMode="numeric"
+                onChange={(e) => set("familyMonthlyNeed", e.target.value.replace(/\D/g, ""))}
+                placeholder="Rp"
+                value={form.familyMonthlyNeed}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="r-capita">Per kapita / bln</Label>
+              <Input
+                id="r-capita"
+                inputMode="numeric"
+                onChange={(e) => set("perCapitaNeed", e.target.value.replace(/\D/g, ""))}
+                placeholder="Rp"
+                value={form.perCapitaNeed}
+              />
+            </div>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="r-food">Indeks pangan</Label>
+            <Input
+              id="r-food"
+              inputMode="decimal"
+              onChange={(e) => set("foodIndex", e.target.value.replace(/[^\d.]/g, ""))}
+              placeholder="mis. 1.08"
+              value={form.foodIndex}
+            />
+          </div>
+        </form>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)} type="button" variant="outline">
+            Batal
+          </Button>
+          <Button disabled={pending} form="add-region-form" type="submit">
+            Tambah
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const prefItems = [
+  {
+    key: "webp",
+    title: "Konversi WebP otomatis",
+    desc: "Kompres & konversi foto unggahan ke WebP di sisi klien.",
+  },
+  {
+    key: "encrypt",
+    title: "Enkripsi dokumen sensitif",
+    desc: "Enkripsi AES-256 untuk arsip KTP, KK, dan SKTM.",
+  },
+  {
+    key: "notifyDecision",
+    title: "Notifikasi keputusan",
+    desc: "Kirim notifikasi saat pengurus menetapkan nominal.",
+  },
+  {
+    key: "offline",
+    title: "Mode offline verifikator",
+    desc: "Izinkan Formulir 2 diisi offline lalu sinkron otomatis.",
+  },
+] as const;
+
+function PreferensiTab() {
+  const { data: settings } = useQuery(settingsQueryOptions);
+  const mutation = useSettingsMutation();
+  const prefs = (settings?.preferences ?? {}) as Record<string, unknown>;
+
+  const toggle = (key: string) => (value: boolean) => {
+    mutation.mutate(
+      { preferences: { ...prefs, [key]: value } },
+      { onSuccess: () => toast.success("Preferensi diperbarui.") },
+    );
+  };
 
   return (
     <Card>
@@ -263,7 +586,7 @@ function PreferensiTab() {
         <CardTitle>Preferensi Sistem</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-3">
-        {items.map((item) => (
+        {prefItems.map((item) => (
           <div
             className="flex items-center justify-between gap-4 rounded-lg border p-4"
             key={item.key}
@@ -272,7 +595,7 @@ function PreferensiTab() {
               <p className="font-medium text-sm">{item.title}</p>
               <p className="text-muted-foreground text-xs">{item.desc}</p>
             </div>
-            <Switch checked={prefs[item.key]} onCheckedChange={toggle(item.key)} />
+            <Switch checked={Boolean(prefs[item.key])} onCheckedChange={toggle(item.key)} />
           </div>
         ))}
       </CardContent>

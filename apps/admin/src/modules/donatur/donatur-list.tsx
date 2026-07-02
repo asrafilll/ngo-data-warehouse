@@ -1,8 +1,7 @@
 // Donatur — fundraising contacts: donation history, recurring commitment, program
-// preference. Search + filter + summary. Mock data from @repo/sip-domain.
-import { donors, formatCurrency, formatDate, type Donor } from "@repo/sip-domain";
+// preference. API-backed search + filter + summary.
+import { formatCurrency, formatDate } from "@repo/sip-domain";
 import { Badge } from "@repo/ui/components/badge";
-import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { NativeSelect, NativeSelectOption } from "@repo/ui/components/native-select";
 import {
@@ -14,11 +13,13 @@ import {
   TableRow,
 } from "@repo/ui/components/table";
 import { cn } from "@repo/ui/lib/utils";
-import { Plus, Search } from "lucide-react";
-import { useMemo, useState } from "react";
-import { TablePagination, paginate } from "../../components/pagination";
+import { useQuery } from "@tanstack/react-query";
+import { Search } from "lucide-react";
+import { useState } from "react";
+import { TablePagination } from "../../components/pagination";
+import { donorsQueryOptions } from "./services";
 
-const statusDot: Record<Donor["status"], string> = {
+const statusDot: Record<string, string> = {
   Aktif: "bg-primary",
   "Perlu follow-up": "bg-primary/60",
   Dormant: "bg-muted-foreground/40",
@@ -32,24 +33,26 @@ export function DonaturList({
   onPageChange: (next: number) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<Donor["status"] | "all">("all");
-  const [type, setType] = useState<Donor["type"] | "all">("all");
+  const [status, setStatus] = useState("all");
+  const [type, setType] = useState("all");
   const resetPage = () => onPageChange(1);
 
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return donors.filter((d) => {
-      if (status !== "all" && d.status !== status) return false;
-      if (type !== "all" && d.type !== type) return false;
-      if (!q) return true;
-      return d.name.toLowerCase().includes(q) || d.programPreference.toLowerCase().includes(q);
-    });
-  }, [query, status, type]);
-  const paged = paginate(rows, page);
+  const { data, isPending } = useQuery(
+    donorsQueryOptions({
+      q: query.trim() || undefined,
+      status: status === "all" ? undefined : status,
+      type: type === "all" ? undefined : type,
+      page,
+    }),
+  );
 
-  const totalDonation = donors.reduce((t, d) => t + d.totalDonation, 0);
-  const activeCount = donors.filter((d) => d.status === "Aktif").length;
-  const recurringCount = donors.filter((d) => d.recurring).length;
+  const rows = data?.donors ?? [];
+  const stats = data?.stats;
+  const total = data?.total ?? 0;
+  const perPage = data?.perPage ?? 10;
+  const pageCount = Math.max(1, Math.ceil(total / perPage));
+  const from = total === 0 ? 0 : (page - 1) * perPage + 1;
+  const to = Math.min(page * perPage, total);
 
   return (
     <div className="mx-auto grid max-w-[1440px] gap-6">
@@ -60,17 +63,13 @@ export function DonaturList({
             Kontak donatur, histori donasi, dan komitmen rutin.
           </p>
         </div>
-        <Button type="button">
-          <Plus className="size-4" strokeWidth={1.8} />
-          Tambah donatur
-        </Button>
       </header>
 
       <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border bg-border lg:grid-cols-4 [&>*]:bg-background">
-        <Stat label="Total donatur" value={`${donors.length}`} />
-        <Stat label="Donatur aktif" value={`${activeCount}`} />
-        <Stat label="Komitmen rutin" value={`${recurringCount}`} />
-        <Stat label="Total donasi tercatat" value={formatCurrency(totalDonation)} />
+        <Stat label="Total donatur" value={`${stats?.total ?? 0}`} />
+        <Stat label="Donatur aktif" value={`${stats?.active ?? 0}`} />
+        <Stat label="Komitmen rutin" value={`${stats?.recurring ?? 0}`} />
+        <Stat label="Total donasi tercatat" value={formatCurrency(stats?.totalDonation ?? 0)} />
       </div>
 
       <div className="rounded-xl border bg-background">
@@ -89,7 +88,7 @@ export function DonaturList({
           </div>
           <NativeSelect
             onChange={(e) => {
-              setType(e.target.value as Donor["type"] | "all");
+              setType(e.target.value);
               resetPage();
             }}
             size="sm"
@@ -102,7 +101,7 @@ export function DonaturList({
           </NativeSelect>
           <NativeSelect
             onChange={(e) => {
-              setStatus(e.target.value as Donor["status"] | "all");
+              setStatus(e.target.value);
               resetPage();
             }}
             size="sm"
@@ -130,11 +129,11 @@ export function DonaturList({
             {rows.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell className="py-12 text-center text-muted-foreground text-sm" colSpan={6}>
-                  Tidak ada donatur yang cocok.
+                  {isPending ? "Memuat donatur…" : "Tidak ada donatur yang cocok."}
                 </TableCell>
               </TableRow>
             ) : (
-              paged.pageRows.map((d) => (
+              rows.map((d) => (
                 <TableRow key={d.id}>
                   <TableCell className="pl-4">
                     <div className="flex items-center gap-2">
@@ -147,10 +146,17 @@ export function DonaturList({
                   </TableCell>
                   <TableCell className="text-sm">{d.channel}</TableCell>
                   <TableCell className="text-sm">{d.programPreference}</TableCell>
-                  <TableCell className="text-sm">{formatDate(d.lastDonationAt)}</TableCell>
+                  <TableCell className="text-sm">
+                    {d.lastDonationAt ? formatDate(d.lastDonationAt) : "—"}
+                  </TableCell>
                   <TableCell>
                     <span className="inline-flex items-center gap-1.5 text-sm">
-                      <span className={cn("size-2 rounded-full", statusDot[d.status])} />
+                      <span
+                        className={cn(
+                          "size-2 rounded-full",
+                          statusDot[d.status] ?? "bg-muted-foreground/40",
+                        )}
+                      />
                       {d.status}
                     </span>
                   </TableCell>
@@ -164,13 +170,13 @@ export function DonaturList({
         </Table>
 
         <TablePagination
-          from={paged.from}
+          from={from}
           label="donatur"
           onPageChange={onPageChange}
-          page={paged.page}
-          pageCount={paged.pageCount}
-          to={paged.to}
-          total={paged.total}
+          page={page}
+          pageCount={pageCount}
+          to={to}
+          total={total}
         />
       </div>
     </div>

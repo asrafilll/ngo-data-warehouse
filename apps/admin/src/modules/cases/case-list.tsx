@@ -1,15 +1,8 @@
 // Bantuan Insidental — one-off cases that run the full 6-stage workflow. Searchable +
-// filterable table, the operational hub the workflow pages branch from. Rutin bantuan is
-// a separate roster (its own menu), so it is excluded here. Mock data from @repo/sip-domain.
-import {
-  aidCases,
-  formatDate,
-  getAssignedVerifier,
-  statusLabels,
-  statusTone,
-  type AidCase,
-  type WorkflowStatus,
-} from "@repo/sip-domain";
+// filterable table backed by the API (server-side filter + pagination). Rutin bantuan is
+// a separate roster (its own menu), so it is excluded here.
+import { formatDate, statusLabels, statusTone, type WorkflowStatus } from "@repo/sip-domain";
+import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { NativeSelect, NativeSelectOption } from "@repo/ui/components/native-select";
@@ -21,15 +14,16 @@ import {
   TableHeader,
   TableRow,
 } from "@repo/ui/components/table";
-import { Badge } from "@repo/ui/components/badge";
 import { cn } from "@repo/ui/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CalendarDays, Plus, Search } from "lucide-react";
-import { useMemo, useState } from "react";
-import { TablePagination, paginate } from "../../components/pagination";
+import { useState } from "react";
+import { TablePagination } from "../../components/pagination";
+import { programsQueryOptions } from "../programs/services";
+import { casesQueryOptions } from "./hooks";
+import type { CaseListRow } from "./services";
 
-const incidentalCases = aidCases.filter((c) => c.aidType === "insidental");
-const programs = [...new Set(incidentalCases.map((c) => c.program))];
 const statusOptions = Object.entries(statusLabels) as Array<[WorkflowStatus, string]>;
 
 export function CaseList({
@@ -44,20 +38,23 @@ export function CaseList({
   const [program, setProgram] = useState<string>("all");
   const resetPage = () => onPageChange(1);
 
-  const rows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return incidentalCases.filter((c) => {
-      if (status !== "all" && c.status !== status) return false;
-      if (program !== "all" && c.program !== program) return false;
-      if (!q) return true;
-      return (
-        c.applicant.name.toLowerCase().includes(q) ||
-        c.caseNumber.toLowerCase().includes(q) ||
-        c.applicant.nik.includes(q) ||
-        c.hadKifayah.region.toLowerCase().includes(q)
-      );
-    });
-  }, [query, status, program]);
+  const { data: programs = [] } = useQuery(programsQueryOptions({ type: "insidental" }));
+  const { data, isPending } = useQuery(
+    casesQueryOptions({
+      page: String(page),
+      q: query.trim() || undefined,
+      status: status === "all" ? undefined : status,
+      program: program === "all" ? undefined : program,
+      aidType: "insidental",
+    }),
+  );
+
+  const rows = data?.rows ?? [];
+  const total = data?.total ?? 0;
+  const perPage = data?.perPage ?? 10;
+  const pageCount = Math.max(1, Math.ceil(total / perPage));
+  const from = total === 0 ? 0 : (page - 1) * perPage + 1;
+  const to = Math.min(page * perPage, total);
 
   const resetFilters = () => {
     setQuery("");
@@ -66,7 +63,6 @@ export function CaseList({
     resetPage();
   };
   const filtered = query !== "" || status !== "all" || program !== "all";
-  const paged = paginate(rows, page);
 
   return (
     <div className="mx-auto grid max-w-[1440px] gap-6">
@@ -125,8 +121,8 @@ export function CaseList({
           >
             <NativeSelectOption value="all">Semua program</NativeSelectOption>
             {programs.map((p) => (
-              <NativeSelectOption key={p} value={p}>
-                {p}
+              <NativeSelectOption key={p.id} value={p.name}>
+                {p.name}
               </NativeSelectOption>
             ))}
           </NativeSelect>
@@ -156,31 +152,30 @@ export function CaseList({
             {rows.length === 0 ? (
               <TableRow className="hover:bg-transparent">
                 <TableCell className="py-12 text-center text-muted-foreground text-sm" colSpan={6}>
-                  Tidak ada kasus yang cocok dengan filter.
+                  {isPending ? "Memuat kasus…" : "Tidak ada kasus yang cocok dengan filter."}
                 </TableCell>
               </TableRow>
             ) : (
-              paged.pageRows.map((c) => <CaseRow caseItem={c} key={c.id} />)
+              rows.map((c) => <CaseRow caseItem={c} key={c.id} />)
             )}
           </TableBody>
         </Table>
 
         <TablePagination
-          from={paged.from}
+          from={from}
           label="kasus"
           onPageChange={onPageChange}
-          page={paged.page}
-          pageCount={paged.pageCount}
-          to={paged.to}
-          total={paged.total}
+          page={page}
+          pageCount={pageCount}
+          to={to}
+          total={total}
         />
       </div>
     </div>
   );
 }
 
-function CaseRow({ caseItem: c }: { caseItem: AidCase }) {
-  const verifier = getAssignedVerifier(c);
+function CaseRow({ caseItem: c }: { caseItem: CaseListRow }) {
   const navigate = useNavigate();
   return (
     <TableRow
@@ -198,20 +193,20 @@ function CaseRow({ caseItem: c }: { caseItem: AidCase }) {
       </TableCell>
       <TableCell>
         <div className="grid gap-0.5">
-          <span className="font-medium">{c.applicant.name}</span>
+          <span className="font-medium">{c.mustahik.name}</span>
           <span className="max-w-[260px] truncate text-muted-foreground text-xs">
-            {c.applicant.address}
+            {c.mustahik.address}
           </span>
         </div>
       </TableCell>
-      <TableCell className="text-sm">{c.program}</TableCell>
-      <TableCell className="text-sm">{c.hadKifayah.region}</TableCell>
+      <TableCell className="text-sm">{c.program.name}</TableCell>
+      <TableCell className="text-sm">{c.mustahik.region?.city ?? "—"}</TableCell>
       <TableCell>
         <Badge className={cn("border font-normal", statusTone[c.status])} variant="outline">
           {statusLabels[c.status]}
         </Badge>
       </TableCell>
-      <TableCell className="pr-4 text-sm">{verifier?.name ?? "—"}</TableCell>
+      <TableCell className="pr-4 text-sm">{c.assignedVerifier?.name ?? "—"}</TableCell>
     </TableRow>
   );
 }

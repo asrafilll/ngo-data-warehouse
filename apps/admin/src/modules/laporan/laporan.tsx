@@ -1,6 +1,6 @@
 // Laporan — operational recap over the caseload: per program, per wilayah, per status,
-// with a period filter and (mock) export. Mock data from @repo/sip-domain.
-import { aidCases, formatCurrency, statusLabels, type WorkflowStatus } from "@repo/sip-domain";
+// with a period filter and (mock) export. Facts from the API; grouping stays client-side.
+import { formatCurrency, statusLabels, type WorkflowStatus } from "@repo/sip-domain";
 import { Button } from "@repo/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";
 import { NativeSelect, NativeSelectOption } from "@repo/ui/components/native-select";
@@ -13,8 +13,10 @@ import {
   TableHeader,
   TableRow,
 } from "@repo/ui/components/table";
+import { useQuery } from "@tanstack/react-query";
 import { Download } from "lucide-react";
 import { useMemo, useState } from "react";
+import { caseFactsQueryOptions } from "./services";
 
 const periodOptions = [
   { key: "all", label: "Semua periode" },
@@ -24,25 +26,26 @@ const periodOptions = [
 
 export function Laporan() {
   const [period, setPeriod] = useState("all");
+  const { data: facts = [] } = useQuery(caseFactsQueryOptions);
 
   const cases = useMemo(
-    () => (period === "all" ? aidCases : aidCases.filter((c) => c.submittedAt.startsWith(period))),
-    [period],
+    () => (period === "all" ? facts : facts.filter((c) => c.submittedAt.startsWith(period))),
+    [facts, period],
   );
 
-  const totalRecommended = cases.reduce((t, c) => t + c.hadKifayah.recommendedAid, 0);
+  const totalRecommended = cases.reduce((t, c) => t + c.recommendedAid, 0);
   const disbursed = cases.filter((c) => c.status === "completed");
   const disbursedAmount = cases.reduce((t, c) => t + (c.decisionNominal ?? 0), 0);
 
   const perProgram = groupSum(
     cases,
     (c) => c.program,
-    (c) => c.hadKifayah.recommendedAid,
+    (c) => c.recommendedAid,
   );
   const perWilayah = groupSum(
     cases,
-    (c) => c.hadKifayah.region,
-    (c) => c.hadKifayah.recommendedAid,
+    (c) => c.region,
+    (c) => c.recommendedAid,
   );
   const perStatus = groupCount(cases, (c) => c.status);
 

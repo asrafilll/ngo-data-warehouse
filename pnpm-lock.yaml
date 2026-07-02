@@ -111,6 +111,12 @@ importers:
       '@repo/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@repo/sip-domain':
+        specifier: workspace:*
+        version: link:../../packages/sip-domain
+      '@repo/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@repo/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
