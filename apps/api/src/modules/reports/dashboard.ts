@@ -1,6 +1,5 @@
-// Dashboard aggregates, computed server-side in one pass. Spans the whole domain —
-// caseload + workflow health, money flow (keputusan/penyaluran/rutin/donasi), verifier
-// workload, and stuck-case alerts — so the client only renders.
+// Dashboard aggregates, computed server-side in one pass. Spans the whole domain:
+// caseload, workflow health, money flow, verifier workload, and stuck-case alerts.
 import type { WorkflowStatus } from "@prisma/client";
 import { prisma } from "../../utils/prisma";
 import { calculateHadKifayah, toMonthlyIncome } from "../cases/had-kifayah";
@@ -45,10 +44,62 @@ const dayMs = 86_400_000;
 const daysSince = (from: Date, now: Date) =>
   Math.max(0, Math.round((now.getTime() - from.getTime()) / dayMs));
 
+type DashboardSource = Awaited<ReturnType<typeof loadDashboardSource>>;
+type CaseRow = DashboardSource["cases"][number];
+type CaseFact = ReturnType<typeof buildCaseFact>;
+type RutinProgressItem = ReturnType<typeof buildRutinProgress>[number];
+
 export async function buildDashboard() {
   const now = new Date();
-  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const currentPeriod = toPeriod(now);
+  const { cases, donors, rutinPrograms, verifiers } = await loadDashboardSource(currentPeriod);
+  const facts = cases.map((row) => buildCaseFact(row, now));
+  const volume = buildVolume(facts, now);
+  const rutinRoster = buildRutinRoster(rutinPrograms);
+  const rutinProgress = buildRutinProgress(rutinPrograms);
 
+  return {
+    period: {
+      label: new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(now),
+      count: volume.periodCount,
+    },
+    volume: {
+      total: volume.total,
+      needsAction: volume.needsAction,
+      triage: volume.triage,
+      approval: volume.approval,
+      disbursement: volume.disbursement,
+      completionRate: volume.completionRate,
+      avgProcessDays: volume.avgProcessDays,
+    },
+    money: buildMoney(facts, donors, rutinRoster),
+    trend: buildTrend(facts, now),
+    geo: {
+      provinces: countBy(facts, (c) => c.province),
+      cities: countBy(facts, (c) => c.region),
+    },
+    programsQty: countBy(facts, (c) => c.program),
+    programsValue: sumBy(
+      facts,
+      (c) => c.program,
+      (c) => c.decisionNominal ?? c.recommendedAid,
+    ),
+    funnel: buildFunnel(facts),
+    demographics: buildDemographics(facts),
+    stuckCases: buildStuckCases(facts),
+    verifierLoad: buildVerifierLoad(facts, verifiers),
+    rutinProgress,
+    funding: buildFunding(facts, donors, rutinProgress),
+    override: buildOverride(facts),
+    recentActivity: buildRecentActivity(facts),
+  };
+}
+
+function toPeriod(now: Date) {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+async function loadDashboardSource(currentPeriod: string) {
   const [cases, donors, rutinPrograms, verifiers] = await Promise.all([
     prisma.aidCase.findMany({
       include: {
@@ -76,46 +127,49 @@ export async function buildDashboard() {
     }),
   ]);
 
-  // Per-case facts (HK computed once, reused by every aggregate below).
-  const facts = cases.map((row) => {
-    const monthlyIncome = row.verification
-      ? row.verification.actualIncome
-      : toMonthlyIncome(row.mustahik.incomeAmount, row.mustahik.incomePeriod);
-    const hk = calculateHadKifayah({
-      region: row.mustahik.region,
-      monthlyIncome,
-      dependents: row.mustahik.dependents,
-      rentCost: row.verification?.rentCost ?? row.mustahik.rentCost,
-    });
-    const lastEvent = row.events[0];
-    return {
-      id: row.id,
-      caseNumber: row.caseNumber,
-      status: row.status,
-      program: row.program.name,
-      name: row.mustahik.name,
-      region: hk.region,
-      province: hk.province,
-      submittedAt: row.submittedAt,
-      disbursedAt: row.disbursedAt,
-      decisionNominal: row.decisionNominal,
-      disbursedNominal: row.disbursement?.nominal ?? null,
-      recommendedAid: hk.recommendedAid,
-      eligibility: hk.eligibility,
-      marital: row.mustahik.maritalStatus,
-      housing: row.mustahik.housingStatus,
-      gender: row.mustahik.gender,
-      dependents: row.mustahik.dependents,
-      verifierName: row.assignedVerifier?.name ?? null,
-      verifierId: row.assignedVerifier?.id ?? null,
-      lastEvent: lastEvent
-        ? { label: lastEvent.label, actor: lastEvent.actor, at: lastEvent.at }
-        : null,
-      daysInStage: daysSince(lastEvent?.at ?? row.submittedAt, now),
-    };
-  });
+  return { cases, donors, rutinPrograms, verifiers };
+}
 
-  // ── Volume ─────────────────────────────────────────────────────────────────
+function buildCaseFact(row: CaseRow, now: Date) {
+  const monthlyIncome = row.verification
+    ? row.verification.actualIncome
+    : toMonthlyIncome(row.mustahik.incomeAmount, row.mustahik.incomePeriod);
+  const hk = calculateHadKifayah({
+    region: row.mustahik.region,
+    monthlyIncome,
+    dependents: row.mustahik.dependents,
+    rentCost: row.verification?.rentCost ?? row.mustahik.rentCost,
+  });
+  const lastEvent = row.events[0];
+
+  return {
+    id: row.id,
+    caseNumber: row.caseNumber,
+    status: row.status,
+    program: row.program.name,
+    name: row.mustahik.name,
+    region: hk.region,
+    province: hk.province,
+    submittedAt: row.submittedAt,
+    disbursedAt: row.disbursedAt,
+    decisionNominal: row.decisionNominal,
+    disbursedNominal: row.disbursement?.nominal ?? null,
+    recommendedAid: hk.recommendedAid,
+    eligibility: hk.eligibility,
+    marital: row.mustahik.maritalStatus,
+    housing: row.mustahik.housingStatus,
+    gender: row.mustahik.gender,
+    dependents: row.mustahik.dependents,
+    verifierName: row.assignedVerifier?.name ?? null,
+    verifierId: row.assignedVerifier?.id ?? null,
+    lastEvent: lastEvent
+      ? { label: lastEvent.label, actor: lastEvent.actor, at: lastEvent.at }
+      : null,
+    daysInStage: daysSince(lastEvent?.at ?? row.submittedAt, now),
+  };
+}
+
+function buildVolume(facts: CaseFact[], now: Date) {
   const completed = facts.filter((c) => c.status === "completed");
   const triage = facts.filter((c) => c.status === "submitted");
   const approval = facts.filter((c) => c.status === "surveyed");
@@ -133,15 +187,34 @@ export async function buildDashboard() {
     ? Math.round(processDays.reduce((a, b) => a + b, 0) / processDays.length)
     : null;
 
-  // ── Money flow ─────────────────────────────────────────────────────────────
-  const rutinRoster = rutinPrograms.flatMap((p) =>
+  return {
+    periodCount,
+    total: facts.length,
+    needsAction: triage.length + approval.length + disbursementQ.length,
+    triage: triage.length,
+    approval: approval.length,
+    disbursement: disbursementQ.length,
+    completionRate: Math.round((completed.length / (facts.length || 1)) * 100),
+    avgProcessDays,
+  };
+}
+
+function buildRutinRoster(rutinPrograms: DashboardSource["rutinPrograms"]) {
+  return rutinPrograms.flatMap((p) =>
     p.rutinBeneficiaries.map((b) => ({
       program: p.name,
       nominal: b.nominal,
       disbursed: b.disbursements.length > 0,
     })),
   );
-  const money = {
+}
+
+function buildMoney(
+  facts: CaseFact[],
+  donors: DashboardSource["donors"],
+  rutinRoster: ReturnType<typeof buildRutinRoster>,
+) {
+  return {
     approvedTotal: facts.reduce((t, c) => t + (c.decisionNominal ?? 0), 0),
     disbursedTotal:
       facts.reduce((t, c) => t + (c.disbursedNominal ?? 0), 0) +
@@ -151,10 +224,11 @@ export async function buildDashboard() {
     donorRecurring: donors.filter((d) => d.recurring).length,
     donorDormant: donors.filter((d) => d.status !== "Aktif").length,
   };
+}
 
-  // ── Trend: submissions per ISO week, last 8 weeks ──────────────────────────
+function buildTrend(facts: CaseFact[], now: Date) {
   const weekMs = 7 * dayMs;
-  const trend = Array.from({ length: 8 }, (_, i) => {
+  return Array.from({ length: 8 }, (_, i) => {
     const end = new Date(now.getTime() - (7 - i) * weekMs + weekMs);
     const start = new Date(end.getTime() - weekMs);
     return {
@@ -162,28 +236,31 @@ export async function buildDashboard() {
       count: facts.filter((c) => c.submittedAt >= start && c.submittedAt < end).length,
     };
   });
+}
 
-  // ── Workflow funnel + aging ────────────────────────────────────────────────
-  const reached = (status: WorkflowStatus, stage: WorkflowStatus) => {
-    if (status === "rejected") return stage === "submitted";
-    if (status === "needs_revision") return stage === "submitted";
-    return stageOrder.indexOf(status) >= stageOrder.indexOf(stage);
-  };
-  const funnel = funnelSteps.map((step) => {
+function reachedStage(status: WorkflowStatus, stage: WorkflowStatus) {
+  if (status === "rejected") return stage === "submitted";
+  if (status === "needs_revision") return stage === "submitted";
+  return stageOrder.indexOf(status) >= stageOrder.indexOf(stage);
+}
+
+function buildFunnel(facts: CaseFact[]) {
+  return funnelSteps.map((step) => {
     const here = facts.filter((c) => c.status === step.status);
     return {
       status: step.status,
       label: step.label,
-      count: facts.filter((c) => reached(c.status, step.status)).length,
+      count: facts.filter((c) => reachedStage(c.status, step.status)).length,
       hereNow: here.length,
       avgAge: here.length
         ? Math.round(here.reduce((t, c) => t + c.daysInStage, 0) / here.length)
         : 0,
     };
   });
+}
 
-  // ── Stuck cases: active, longest sitting in current stage first ────────────
-  const stuckCases = facts
+function buildStuckCases(facts: CaseFact[]) {
+  return facts
     .filter((c) => activeStatuses.includes(c.status))
     .sort((a, b) => b.daysInStage - a.daysInStage)
     .slice(0, 8)
@@ -196,24 +273,26 @@ export async function buildDashboard() {
       verifierName: c.verifierName,
       daysInStage: c.daysInStage,
     }));
+}
 
-  // ── Verifier workload: open cases per active verifikator ──────────────────
+function buildVerifierLoad(facts: CaseFact[], verifiers: DashboardSource["verifiers"]) {
   const openByVerifier = new Map<string, number>();
   for (const c of facts) {
     if (c.verifierId && activeStatuses.includes(c.status)) {
       openByVerifier.set(c.verifierId, (openByVerifier.get(c.verifierId) ?? 0) + 1);
     }
   }
-  const verifierLoad = verifiers
+  return verifiers
     .map((v) => ({
       name: v.name,
       region: v.region ?? "-",
       open: openByVerifier.get(v.id) ?? 0,
     }))
     .sort((a, b) => b.open - a.open);
+}
 
-  // ── Rutin progress for the current period ─────────────────────────────────
-  const rutinProgress = rutinPrograms.map((p) => {
+function buildRutinProgress(rutinPrograms: DashboardSource["rutinPrograms"]) {
+  return rutinPrograms.map((p) => {
     const roster = p.rutinBeneficiaries;
     const done = roster.filter((b) => b.disbursements.length > 0);
     return {
@@ -225,8 +304,13 @@ export async function buildDashboard() {
       nominalDisbursed: done.reduce((t, b) => t + b.nominal, 0),
     };
   });
+}
 
-  // ── Funding: donor preference (supply) vs case demand per program ─────────
+function buildFunding(
+  facts: CaseFact[],
+  donors: DashboardSource["donors"],
+  rutinProgress: RutinProgressItem[],
+) {
   const demand = sumBy(
     facts,
     (c) => c.program,
@@ -241,11 +325,12 @@ export async function buildDashboard() {
     if (existing) existing.value += p.nominalTotal;
     else demand.push({ label: p.name, value: p.nominalTotal });
   }
-  const funding = demand
+  return demand
     .sort((a, b) => b.value - a.value)
     .map((d) => ({ program: d.label, demand: d.value, supply: supplyMap.get(d.label) ?? 0 }));
+}
 
-  // ── Override meter: keputusan pengurus vs rekomendasi sistem ──────────────
+function buildOverride(facts: CaseFact[]) {
   const decided = facts.filter((c) => c.decisionNominal && c.recommendedAid > 0);
   const overrideAvgPct = decided.length
     ? Math.round(
@@ -258,54 +343,28 @@ export async function buildDashboard() {
       )
     : null;
 
+  return { decidedCount: decided.length, avgPct: overrideAvgPct };
+}
+
+function buildDemographics(facts: CaseFact[]) {
   return {
-    period: {
-      label: new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(now),
-      count: periodCount,
-    },
-    volume: {
-      total: facts.length,
-      needsAction: triage.length + approval.length + disbursementQ.length,
-      triage: triage.length,
-      approval: approval.length,
-      disbursement: disbursementQ.length,
-      completionRate: Math.round((completed.length / (facts.length || 1)) * 100),
-      avgProcessDays,
-    },
-    money,
-    trend,
-    geo: {
-      provinces: countBy(facts, (c) => c.province),
-      cities: countBy(facts, (c) => c.region),
-    },
-    programsQty: countBy(facts, (c) => c.program),
-    programsValue: sumBy(
-      facts,
-      (c) => c.program,
-      (c) => c.decisionNominal ?? c.recommendedAid,
-    ),
-    funnel,
-    demographics: {
-      marital: countBy(facts, (c) => c.marital),
-      housing: countBy(facts, (c) => c.housing),
-      gender: countBy(facts, (c) => c.gender),
-      eligibility: ["Sangat Layak", "Layak", "Perlu Review", "Tidak Layak"]
-        .map((label) => ({ label, count: facts.filter((c) => c.eligibility === label).length }))
-        .filter((e) => e.count > 0),
-      avgDependents: (facts.reduce((t, c) => t + c.dependents, 0) / (facts.length || 1)).toFixed(1),
-    },
-    stuckCases,
-    verifierLoad,
-    rutinProgress,
-    funding,
-    override: { decidedCount: decided.length, avgPct: overrideAvgPct },
-    recentActivity: facts
-      .flatMap((c) =>
-        c.lastEvent
-          ? [{ ...c.lastEvent, caseNumber: c.caseNumber, id: c.id, applicant: c.name }]
-          : [],
-      )
-      .sort((a, b) => b.at.getTime() - a.at.getTime())
-      .slice(0, 6),
+    marital: countBy(facts, (c) => c.marital),
+    housing: countBy(facts, (c) => c.housing),
+    gender: countBy(facts, (c) => c.gender),
+    eligibility: ["Sangat Layak", "Layak", "Perlu Review", "Tidak Layak"]
+      .map((label) => ({ label, count: facts.filter((c) => c.eligibility === label).length }))
+      .filter((e) => e.count > 0),
+    avgDependents: (facts.reduce((t, c) => t + c.dependents, 0) / (facts.length || 1)).toFixed(1),
   };
+}
+
+function buildRecentActivity(facts: CaseFact[]) {
+  return facts
+    .flatMap((c) =>
+      c.lastEvent
+        ? [{ ...c.lastEvent, caseNumber: c.caseNumber, id: c.id, applicant: c.name }]
+        : [],
+    )
+    .sort((a, b) => b.at.getTime() - a.at.getTime())
+    .slice(0, 6);
 }

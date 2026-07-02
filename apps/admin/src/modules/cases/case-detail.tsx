@@ -13,7 +13,6 @@ import { Badge } from "@repo/ui/components/badge";
 import { Button } from "@repo/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@repo/ui/components/card";
 import { Input } from "@repo/ui/components/input";
-import { Label } from "@repo/ui/components/label";
 import { NativeSelect, NativeSelectOption } from "@repo/ui/components/native-select";
 import { toast } from "@repo/ui/components/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@repo/ui/components/tabs";
@@ -21,9 +20,10 @@ import { Textarea } from "@repo/ui/components/textarea";
 import { cn } from "@repo/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeft, Check, Clock, ImageIcon, Upload } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { ArrowLeft, Clock, ImageIcon, Upload } from "lucide-react";
+import { type FormEvent, useState } from "react";
 import { usersQueryOptions } from "../pengaturan/services";
+import { EmptyState, FormField, Item, Line, Stepper } from "./case-detail-parts";
 import {
   caseQueryOptions,
   useAssignMutation,
@@ -109,40 +109,6 @@ export function CaseDetail({ caseId }: { caseId: string }) {
           <TimelineCard caseItem={c} />
         </aside>
       </div>
-    </div>
-  );
-}
-
-function Stepper({ currentIndex }: { currentIndex: number }) {
-  return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-3 rounded-xl border bg-background p-4">
-      {workflowSteps.map((step, i) => {
-        const done = currentIndex >= 0 && i < currentIndex;
-        const active = i === currentIndex;
-        return (
-          <div className="flex items-center gap-2" key={step.status}>
-            <span
-              className={cn(
-                "grid size-6 shrink-0 place-items-center rounded-full border text-xs tabular-nums",
-                done && "border-primary bg-primary text-primary-foreground",
-                active && "border-primary text-primary",
-                !done && !active && "border-border text-muted-foreground",
-              )}
-            >
-              {done ? <Check className="size-3.5" strokeWidth={2.5} /> : i + 1}
-            </span>
-            <span
-              className={cn(
-                "text-sm",
-                active ? "font-medium text-foreground" : "text-muted-foreground",
-              )}
-            >
-              {step.label}
-            </span>
-            {i < workflowSteps.length - 1 ? <span className="mx-1 h-px w-6 bg-border" /> : null}
-          </div>
-        );
-      })}
     </div>
   );
 }
@@ -410,7 +376,7 @@ function VerificationForm({ caseItem: c }: { caseItem: CaseDetailData }) {
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }));
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setUploading(true);
     try {
@@ -609,7 +575,7 @@ function DisburseForm({ caseItem: c }: { caseItem: CaseDetailData }) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!file) {
       toast.error("Bukti foto penyaluran wajib diunggah.");
@@ -720,15 +686,14 @@ function HadKifayahPanel({ caseItem: c }: { caseItem: CaseDetailData }) {
 
         {canDecide ? (
           <div className="grid gap-3 border-t pt-4">
-            <div className="grid gap-2">
-              <Label htmlFor="nominal">Nominal keputusan (override)</Label>
+            <FormField htmlFor="nominal" label="Nominal keputusan (override)">
               <Input
                 id="nominal"
                 inputMode="numeric"
                 onChange={(e) => setNominal(e.target.value.replace(/\D/g, ""))}
                 value={nominal}
               />
-            </div>
+            </FormField>
             <div className="grid grid-cols-2 gap-2">
               <Button
                 disabled={decision.isPending || !nominal}
@@ -802,58 +767,5 @@ function TimelineCard({ caseItem: c }: { caseItem: CaseDetailData }) {
         </ol>
       </CardContent>
     </Card>
-  );
-}
-
-function FormField({
-  label,
-  htmlFor,
-  className,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className={cn("grid gap-2", className)}>
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-    </div>
-  );
-}
-
-function Item({
-  label,
-  value,
-  className,
-}: {
-  label: string;
-  value: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn("grid gap-0.5", className)}>
-      <span className="text-muted-foreground text-xs">{label}</span>
-      <span className="text-sm">{value}</span>
-    </div>
-  );
-}
-
-function Line({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={cn("tabular-nums", strong ? "font-semibold" : "font-medium")}>{value}</span>
-    </div>
-  );
-}
-
-function EmptyState({ text }: { text: string }) {
-  return (
-    <div className="rounded-xl border border-dashed bg-background p-10 text-center">
-      <p className="mx-auto max-w-md text-muted-foreground text-sm">{text}</p>
-    </div>
   );
 }
