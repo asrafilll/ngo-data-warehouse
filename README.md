@@ -3,7 +3,6 @@
 pnpm workspace with:
 
 - `apps/api`: Hono API on Node.js.
-- `apps/platform`: React + Vite + TanStack Router file routes + TanStack Query.
 - `apps/admin`: React + Vite + TanStack Router file routes + TanStack Query.
 - `packages/api-client`: typed Hono RPC client shared by the frontend apps.
 - `packages/config`: typed server-side environment config.
@@ -30,7 +29,6 @@ pnpm db:migrate
 
 ```sh
 pnpm --filter @repo/api dev
-pnpm --filter @repo/platform dev
 pnpm --filter @repo/admin dev
 pnpm --filter @repo/worker dev
 ```
@@ -41,7 +39,7 @@ pnpm --filter @repo/worker dev
 pnpm test
 ```
 
-This runs the base Vitest suites for API, Platform, Admin, and Worker.
+This runs the base Vitest suites for API, Admin, and Worker.
 
 ## Auth and API Client
 
@@ -78,6 +76,10 @@ await storage.putObject({
 ```
 
 Configure it with `S3_BUCKET`, `S3_REGION`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and optional endpoint/path-style/public URL variables in `.env`.
+
+For the bundled MinIO service, use `S3_FORCE_PATH_STYLE=true`. In production, set
+`S3_ENDPOINT` to the public HTTPS URL that the browser can reach, for example
+`https://minio.example.com`; presigned uploads are performed directly from the admin UI.
 
 ## Logging
 
@@ -127,12 +129,19 @@ cp .env.example .env
 docker compose up --build
 ```
 
-This starts Postgres, Redis, API, Platform, Admin, and Worker. The Docker services still use the single root `.env`; `DOCKER_DATABASE_URL` and `DOCKER_REDIS_URL` point containers at the Compose service names. Postgres and Redis are internal-only in `docker-compose.yaml`; use `docker-compose.dev.yaml` when you want host access to those ports for local tooling.
+This starts Postgres, Redis, MinIO, API, Admin, and Worker. The Docker services still use the single root `.env`; `DOCKER_DATABASE_URL` and `DOCKER_REDIS_URL` point containers at the Compose service names. Postgres and Redis are internal-only in `docker-compose.yaml`; use `docker-compose.dev.yaml` when you want host access to those ports for local tooling.
+
+For production with MinIO, set strong values for `MINIO_ROOT_USER`,
+`MINIO_ROOT_PASSWORD`, `S3_ACCESS_KEY_ID`, and `S3_SECRET_ACCESS_KEY`. If the admin UI
+runs at a public domain, `S3_ENDPOINT` must also be public and HTTPS; do not use
+`http://minio:9000` for browser uploads. Set `MINIO_API_CORS_ALLOW_ORIGIN` to the
+admin URL so browser-based presigned uploads are allowed.
 
 The default local ports are:
 
 - API: `http://localhost:8000`
-- Platform: `http://localhost:3000`
 - Admin: `http://localhost:4000`
+- MinIO API: `http://localhost:9000`
+- MinIO console: `http://localhost:9001`
 - Postgres with `docker-compose.dev.yaml`: `localhost:15432`
 - Redis with `docker-compose.dev.yaml`: `localhost:16379`
