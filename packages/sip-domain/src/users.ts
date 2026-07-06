@@ -1,13 +1,13 @@
 import type { SipUser } from "./types";
 
-// Mock user roster for the SIP admin prototype.
+// Mock user roster for the NGO admin prototype.
 export const sipUsers: SipUser[] = [
   {
     id: "usr-001",
     name: "Nur Azizah",
     role: "pengurus",
     phone: "0812-3100-2188",
-    region: "SIP Center",
+    region: "NGO Center",
     status: "Aktif",
   },
   {
@@ -15,7 +15,7 @@ export const sipUsers: SipUser[] = [
     name: "Fikri Ramadhan",
     role: "admin",
     phone: "0813-8821-4409",
-    region: "SIP Center",
+    region: "NGO Center",
     status: "Aktif",
   },
   {
@@ -79,7 +79,7 @@ export const sipUsers: SipUser[] = [
     name: "Abdul Somad",
     role: "pengurus",
     phone: "0812-3322-1144",
-    region: "SIP Center",
+    region: "NGO Center",
     status: "Aktif",
   },
   {
@@ -87,7 +87,7 @@ export const sipUsers: SipUser[] = [
     name: "Yuliana Sari",
     role: "admin",
     phone: "0857-6543-7788",
-    region: "SIP Center",
+    region: "NGO Center",
     status: "Aktif",
   },
 ];

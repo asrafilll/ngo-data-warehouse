@@ -1,4 +1,4 @@
-// Entry point — SIP console login. Standalone page, rendered outside the app shell.
+// Entry point — NGO console login. Standalone page, rendered outside the app shell.
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
@@ -12,7 +12,7 @@ export const Route = createFileRoute("/")({
 });
 
 function LoginPage() {
-  const [email, setEmail] = useState("admin@sip.or.id");
+  const [email, setEmail] = useState("admin@ngo.or.id");
   const [password, setPassword] = useState("");
   const loginMutation = useLoginMutation();
 
@@ -28,9 +28,9 @@ function LoginPage() {
         <div className="flex items-center gap-3">
           <SipLogo className="size-11" />
           <span>
-            <span className="block font-semibold text-sidebar-accent-foreground">SIM-M SIP</span>
+            <span className="block font-semibold text-sidebar-accent-foreground">SIM-M NGO</span>
             <span className="block text-sidebar-foreground/70 text-xs">
-              Solidaritas Insan Peduli
+              Manajemen Bantuan
             </span>
           </span>
         </div>
@@ -46,7 +46,7 @@ function LoginPage() {
         </div>
 
         <p className="text-sidebar-foreground/60 text-xs">
-          © 2026 Solidaritas Insan Peduli · Prototype
+          © 2026 Manajemen Bantuan · Prototype
         </p>
       </aside>
 
@@ -56,8 +56,8 @@ function LoginPage() {
           <div className="mb-8 flex items-center gap-3 lg:hidden">
             <SipLogo className="size-10" />
             <span>
-              <span className="block font-semibold text-sm">SIM-M SIP</span>
-              <span className="block text-muted-foreground text-xs">Solidaritas Insan Peduli</span>
+              <span className="block font-semibold text-sm">SIM-M NGO</span>
+              <span className="block text-muted-foreground text-xs">Manajemen Bantuan</span>
             </span>
           </div>
 
@@ -74,7 +74,7 @@ function LoginPage() {
                 id="email"
                 required
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nama@sip.or.id"
+                placeholder="nama@ngo.or.id"
                 type="email"
                 value={email}
               />

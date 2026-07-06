@@ -76,7 +76,7 @@ function AppLayout() {
             <div className="rounded-lg border border-sidebar-border bg-sidebar-accent p-4">
               <div className="flex items-center gap-2 font-medium text-sidebar-accent-foreground text-sm">
                 <ShieldCheck className="size-4 text-primary" strokeWidth={1.8} />
-                Internal SIP
+                Internal NGO
               </div>
               <p className="mt-2 text-muted-foreground text-xs leading-5">
                 Dashboard untuk data bantuan, mustahik, donatur, program, dan laporan operasional.
@@ -100,14 +100,14 @@ function AppLayout() {
                 <Link className="flex items-center gap-3 lg:hidden" to="/dashboard">
                   <SipLogo className="size-10" />
                   <span>
-                    <span className="block font-semibold text-sm">SIM-M SIP</span>
+                    <span className="block font-semibold text-sm">SIM-M NGO</span>
                     <span className="block text-muted-foreground text-xs">Management console</span>
                   </span>
                 </Link>
 
                 <div className="hidden lg:block">
-                  <h1 className="font-semibold text-sm">Manajemen SIP</h1>
-                  <p className="text-muted-foreground text-xs">Solidaritas Insan Peduli</p>
+                  <h1 className="font-semibold text-sm">Manajemen NGO</h1>
+                  <p className="text-muted-foreground text-xs">Manajemen Bantuan</p>
                 </div>
 
                 <div className="ml-auto flex items-center gap-2">
@@ -137,8 +137,8 @@ function SidebarBrand() {
       <Link className="flex items-center gap-3" to="/dashboard">
         <SipLogo className="size-11" />
         <span>
-          <span className="block font-semibold text-sidebar-accent-foreground">SIM-M SIP</span>
-          <span className="block text-muted-foreground text-xs">Solidaritas Insan Peduli</span>
+          <span className="block font-semibold text-sidebar-accent-foreground">SIM-M NGO</span>
+          <span className="block text-muted-foreground text-xs">Manajemen Bantuan</span>
         </span>
       </Link>
     </div>

@@ -14,7 +14,7 @@ import type {
 const baseAidCases: AidCase[] = [
   {
     id: "case-001",
-    caseNumber: "SIP-2026-071",
+    caseNumber: "NGO-2026-071",
     aidType: "insidental",
     program: "Kesehatan",
     status: "surveyed",
@@ -100,7 +100,7 @@ const baseAidCases: AidCase[] = [
         label: "Pengajuan dibuat",
         actor: "Fikri Ramadhan",
         at: "27 Jun 2026, 09:30",
-        note: "Data awal dan pelapor dicatat dari SIP Center.",
+        note: "Data awal dan pelapor dicatat dari NGO Center.",
       },
       {
         label: "Disetujui untuk verifikasi",
@@ -118,7 +118,7 @@ const baseAidCases: AidCase[] = [
   },
   {
     id: "case-002",
-    caseNumber: "SIP-2026-072",
+    caseNumber: "NGO-2026-072",
     aidType: "insidental",
     program: "Kebutuhan Pokok",
     status: "submitted",
@@ -145,7 +145,7 @@ const baseAidCases: AidCase[] = [
       phone: "0858-9901-2208",
       prayerStatus: "Jarang",
       smokingStatus: "Jarang",
-      priorHelp: "Belum pernah dibantu SIP.",
+      priorHelp: "Belum pernah dibantu NGO.",
       publishConsent: false,
       sktmStatus: "Bersedia mengurus",
       infoSource: "Relawan wilayah Bogor",
@@ -153,7 +153,7 @@ const baseAidCases: AidCase[] = [
     reporter: {
       name: "Dewi Lestari",
       relation: "Verifikator wilayah",
-      institution: "SIP Bogor",
+      institution: "NGO Bogor",
       address: "Bogor Selatan",
       phone: "0821-1902-5521",
     },
@@ -185,7 +185,7 @@ const baseAidCases: AidCase[] = [
   },
   {
     id: "case-003",
-    caseNumber: "SIP-2026-073",
+    caseNumber: "NGO-2026-073",
     aidType: "insidental",
     program: "Pendidikan",
     status: "assigned",
@@ -258,7 +258,7 @@ const baseAidCases: AidCase[] = [
   },
   {
     id: "case-004",
-    caseNumber: "SIP-2026-069",
+    caseNumber: "NGO-2026-069",
     aidType: "insidental",
     program: "Darurat Hunian",
     status: "disbursement_pending",
@@ -288,10 +288,10 @@ const baseAidCases: AidCase[] = [
       phone: "0813-4044-9091",
       prayerStatus: "Ya",
       smokingStatus: "Tidak",
-      priorHelp: "Belum pernah dibantu SIP.",
+      priorHelp: "Belum pernah dibantu NGO.",
       publishConsent: true,
       sktmStatus: "Sudah ada",
-      infoSource: "SIP Center",
+      infoSource: "NGO Center",
     },
     reporter: {
       name: "Pak Adnan",
@@ -341,7 +341,7 @@ const baseAidCases: AidCase[] = [
         label: "Pengajuan dibuat",
         actor: "Fikri Ramadhan",
         at: "21 Jun 2026, 08:40",
-        note: "Laporan RT diterima oleh SIP Center.",
+        note: "Laporan RT diterima oleh NGO Center.",
       },
       {
         label: "Verifikasi selesai",
@@ -359,7 +359,7 @@ const baseAidCases: AidCase[] = [
   },
   {
     id: "case-005",
-    caseNumber: "SIP-2026-065",
+    caseNumber: "NGO-2026-065",
     aidType: "rutin_bulanan",
     program: "Anak Asuh",
     status: "completed",
@@ -388,7 +388,7 @@ const baseAidCases: AidCase[] = [
       phone: "0812-8844-1200",
       prayerStatus: "Ya",
       smokingStatus: "Tidak",
-      priorHelp: "Masuk program anak asuh SIP sejak Juni 2026.",
+      priorHelp: "Masuk program anak asuh NGO sejak Juni 2026.",
       publishConsent: true,
       sktmStatus: "Sudah ada",
       infoSource: "Pengurus sekolah",
@@ -656,7 +656,7 @@ const generatedAidCases: AidCase[] = statusPlan.map((status, i) => {
 
   return {
     id: `case-1${String(i).padStart(2, "0")}`,
-    caseNumber: `SIP-2026-1${String(i).padStart(2, "0")}`,
+    caseNumber: `NGO-2026-1${String(i).padStart(2, "0")}`,
     aidType: "insidental",
     program,
     status,

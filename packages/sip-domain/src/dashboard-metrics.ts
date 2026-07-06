@@ -30,7 +30,7 @@ export const moduleSummaries: ModuleSummary[] = [
   },
   {
     key: "program",
-    label: "Program SIP",
+    label: "Program NGO",
     description: "Kesehatan, pendidikan, kebutuhan pokok, anak asuh, dan program lain.",
     total: 7,
     active: 6,

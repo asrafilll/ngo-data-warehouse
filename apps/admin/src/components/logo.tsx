@@ -1,6 +1,6 @@
 import { cn } from "@repo/ui/lib/utils";
 
-// SIP brand mark. The logo art is full green, so it sits on a tokenized tile to stay
+// NGO brand mark. The logo art is full green, so it sits on a tokenized tile to stay
 // legible on both the dark-green sidebar and light surfaces.
 export function SipLogo({ className }: { className?: string }) {
   return (
@@ -11,9 +11,9 @@ export function SipLogo({ className }: { className?: string }) {
       )}
     >
       <img
-        alt="Solidaritas Insan Peduli"
+        alt="NGO"
         className="size-full object-contain"
-        src="/sip_logo.png"
+        src="/ngo_logo.svg"
       />
     </span>
   );

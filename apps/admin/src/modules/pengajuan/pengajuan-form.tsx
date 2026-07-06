@@ -333,7 +333,7 @@ export function PengajuanForm() {
                 value={form.sktm}
               />
             </Field>
-            <Field htmlFor="asalInfo" label="Asal informasi tentang SIP">
+            <Field htmlFor="asalInfo" label="Asal informasi tentang NGO">
               <Input
                 id="asalInfo"
                 onChange={(e) => set("asalInfo", e.target.value)}
@@ -344,7 +344,7 @@ export function PengajuanForm() {
             <Field
               className="sm:col-span-2"
               htmlFor="priorHelp"
-              label="Sudah pernah dibantu SIP / lembaga lain"
+              label="Sudah pernah dibantu NGO / lembaga lain"
             >
               <Textarea
                 id="priorHelp"
