@@ -5,6 +5,9 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   envDir: "../..",
+  preview: {
+    allowedHosts: ["sip.asrafil.dev"],
+  },
   plugins: [
     tanstackRouter({
       target: "react",

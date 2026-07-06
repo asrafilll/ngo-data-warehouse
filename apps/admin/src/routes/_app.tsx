@@ -12,9 +12,11 @@ import {
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
-import type { ComponentType } from "react";
+import { useEffect, type ComponentType } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { SipLogo } from "../components/logo";
+import { meQueryOptions, useLogoutMutation } from "../modules/auth/hooks/use-auth";
 
 export const Route = createFileRoute("/_app")({
   component: AppLayout,
@@ -39,6 +41,26 @@ const navigationItems: NavItem[] = [
 
 function AppLayout() {
   const navigate = useNavigate();
+  const logoutMutation = useLogoutMutation();
+  const meQuery = useQuery(meQueryOptions);
+
+  useEffect(() => {
+    if (meQuery.isError) {
+      void navigate({ to: "/" });
+    }
+  }, [meQuery.isError, navigate]);
+
+  if (meQuery.isPending) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-muted/40 text-muted-foreground text-sm">
+        Memuat sesi…
+      </div>
+    );
+  }
+
+  if (meQuery.isError) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-muted/40 text-foreground">
@@ -62,11 +84,11 @@ function AppLayout() {
             </div>
             <button
               className="mt-3 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sidebar-foreground/70 text-sm transition hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              onClick={() => navigate({ to: "/" })}
+              onClick={() => logoutMutation.mutate()}
               type="button"
             >
               <LogOut className="size-4" strokeWidth={1.8} />
-              Keluar
+              {logoutMutation.isPending ? "Keluar…" : "Keluar"}
             </button>
           </div>
         </aside>

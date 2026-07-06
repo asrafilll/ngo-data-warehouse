@@ -44,8 +44,8 @@ services:
       MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD}"
       MINIO_API_CORS_ALLOW_ORIGIN: "${MINIO_API_CORS_ALLOW_ORIGIN:-http://localhost:4000}"
     ports:
-      - "${MINIO_API_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio_data:/data
     command: ["server", "/data", "--console-address", ":9001"]
@@ -98,7 +98,7 @@ services:
       TELEMETRY_EXPORTER_OTLP_ENDPOINT: "${TELEMETRY_EXPORTER_OTLP_ENDPOINT:-}"
       TELEMETRY_SERVICE_NAMESPACE: "${TELEMETRY_SERVICE_NAMESPACE:-monorepo-template}"
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -109,7 +109,6 @@ services:
     command: sh -c "pnpm --filter @repo/api exec prisma migrate deploy && pnpm --filter @repo/api start"
 
   admin:
-    <<: *app
     image: monorepo-template-app
     container_name: monorepo-template-admin
     restart: unless-stopped
@@ -117,19 +116,21 @@ services:
       NODE_ENV: "${NODE_ENV:-production}"
       VITE_API_URL: "${VITE_API_URL:-http://localhost:8000}"
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
     depends_on:
       api:
         condition: service_started
     command: sh -c "pnpm --filter @repo/admin build && pnpm --filter @repo/admin preview"
 
   worker:
-    <<: *app
     image: monorepo-template-app
     container_name: monorepo-template-worker
     restart: unless-stopped
     environment:
       NODE_ENV: "${NODE_ENV:-production}"
+      BETTER_AUTH_SECRET: "${BETTER_AUTH_SECRET:-dev-change-me}"
+      BETTER_AUTH_URL: "${BETTER_AUTH_URL:-http://localhost:8000}"
+      CLIENT_ORIGINS: "${CLIENT_ORIGINS:-http://localhost:3000,http://localhost:4000}"
       DATABASE_URL: "${DOCKER_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/monorepo_template?schema=public}"
       ENABLE_TELEMETRY: "${ENABLE_TELEMETRY:-false}"
       LOG_LEVEL: "${LOG_LEVEL:-info}"

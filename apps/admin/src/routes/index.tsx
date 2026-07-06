@@ -1,27 +1,24 @@
-// Entry point — SIP console login. Mocked for the demo: any credentials enter the app
-// (no backend). Standalone page, rendered outside the app shell (not under /_app).
+// Entry point — SIP console login. Standalone page, rendered outside the app shell.
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 import { SipLogo } from "../components/logo";
+import { useLoginMutation } from "../modules/auth/hooks/use-auth";
 
 export const Route = createFileRoute("/")({
   component: LoginPage,
 });
 
 function LoginPage() {
-  const navigate = useNavigate();
   const [email, setEmail] = useState("admin@sip.or.id");
-  const [password, setPassword] = useState("demo1234");
-  const [pending, setPending] = useState(false);
+  const [password, setPassword] = useState("");
+  const loginMutation = useLoginMutation();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setPending(true);
-    // Mock auth — no backend. Short delay to feel real, then enter the console.
-    setTimeout(() => navigate({ to: "/dashboard" }), 350);
+    loginMutation.mutate({ email, password });
   }
 
   return (
@@ -75,6 +72,7 @@ function LoginPage() {
               <Input
                 autoComplete="email"
                 id="email"
+                required
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="nama@sip.or.id"
                 type="email"
@@ -94,13 +92,19 @@ function LoginPage() {
               <Input
                 autoComplete="current-password"
                 id="password"
+                required
                 onChange={(e) => setPassword(e.target.value)}
                 type="password"
                 value={password}
               />
             </div>
-            <Button className="mt-2 w-full" disabled={pending} type="submit">
-              {pending ? "Memuat…" : "Masuk"}
+            {loginMutation.isError ? (
+              <p className="rounded-lg border bg-muted px-3 py-2 text-destructive text-sm">
+                Email atau kata sandi tidak sesuai.
+              </p>
+            ) : null}
+            <Button className="mt-2 w-full" disabled={loginMutation.isPending} type="submit">
+              {loginMutation.isPending ? "Memuat…" : "Masuk"}
             </Button>
           </form>
         </div>
