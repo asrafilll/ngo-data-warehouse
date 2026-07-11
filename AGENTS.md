@@ -1,7 +1,96 @@
 # AGENTS.md
 
-Conventions for working in this repo. This file documents the **styling preferences**
-established for the SIP admin UI. Follow them for any new screen or component.
+Guide for AI agents and developers working in this repo. Read this before touching code.
+Task-by-task playbooks (add a module, run a migration, etc.) live in **SKILLS.md**.
+
+## What this app is
+
+**SIP Manajemen** — internal ops console for Solidaritas Insan Peduli (zakat/social-aid NGO).
+Manages aid requests (pengajuan), field verification, decisions, disbursement, monthly
+rosters (bantuan rutin), mustahik (beneficiary) master data, donors, and reports.
+Status: validation prototype. **All UI copy is Bahasa Indonesia.**
+
+## Stack
+
+| Layer | Tech |
+|---|---|
+| Monorepo | pnpm workspaces (`apps/*`, `packages/*`), Biome (lint + format), TypeScript strict |
+| API | Hono + `@hono/zod-validator`, Prisma + PostgreSQL (`pg` adapter), better-auth |
+| Admin SPA | React 19, Vite, TanStack Router (file-based) + React Query, Tailwind v4 |
+| Shared UI | `@repo/ui` — shadcn on radix/base-ui primitives, tokens in `src/styles.css` |
+| Type-safe client | `@repo/api-client` — Hono `hc<AppType>` RPC client, types inferred from API |
+| Domain | `@repo/sip-domain` — workflow states, labels, Had Kifayah logic, formatters. Zero deps. |
+| Worker | `@repo/worker` — BullMQ (Redis) |
+| Storage | `@repo/storage` — S3/MinIO presigned uploads |
+| Infra | Docker Compose (Postgres, Redis, MinIO), Caddy, OpenTelemetry + pino |
+
+## Repo map
+
+```
+apps/api/            Hono API. src/modules/<name>/router.ts per domain; app.ts mounts all.
+apps/api/prisma/     schema.prisma (17 models), migrations, seed.ts
+apps/admin/          SPA. src/routes/ = TanStack file routes; src/modules/<name>/ = feature code
+packages/sip-domain/ Pure domain logic — workflow statuses, Had Kifayah, formatters, types
+packages/api-client/ hc client factory; import type { AppType } from @repo/api
+packages/ui/         Shared components (@repo/ui/components/*), cn util, theme tokens
+packages/config/     Zod-validated env config (apiConfig, etc.)
+packages/{logger,telemetry,storage,i18n,worker}
+scripts/createsuperuser.ts
+docs/untracked/      PRD drafts (not committed context)
+```
+
+## Core patterns — follow these exactly
+
+### API module (`apps/api/src/modules/<name>/`)
+- One `router.ts` exporting `new Hono<{ Variables: AuthVariables }>()` with **chained**
+  routes (chaining is required — `AppType` inference breaks otherwise).
+- Zod schemas at top of file, applied via `zValidator("json" | "query" | "param", schema)`.
+- Auth: `requireUser` / `requireRole(...)` middleware from `../auth/middleware`.
+- DB via `prisma` from `../../utils/prisma`.
+- Mount the router in `src/app.ts` — this is what propagates types to the client.
+
+### Admin feature module (`apps/admin/src/modules/<name>/`)
+- `services.ts` — typed API calls. Types come from `InferRequestType` / `InferResponseType`
+  on the `api` client (`../../lib/api`), never hand-written DTOs. Wrap calls in `unwrap`.
+- `hooks.ts` — React Query. `queryOptions()` factories, `["<name>"]` key prefix,
+  mutations invalidate the prefix on success, `toast.error(error.message)` on error.
+- `*.tsx` — render-only components. Aggregation/derivation goes in `data.ts`.
+- Route files in `src/routes/` stay thin: load `queryOptions` + render the module component.
+- **No `useEffect` for data fetching. Ever.** React Query only.
+
+### Domain logic
+Workflow statuses, labels, tones, step order live in `@repo/sip-domain` (`workflow.ts`,
+`types.ts`). Case workflow: `submitted → approved_for_verification → assigned → surveyed →
+approved|rejected → disbursement_pending → completed` (+ `needs_revision`). Never inline
+status strings/labels in UI — import from sip-domain. Same for `formatCurrency` /
+`formatDate` (id-ID locale).
+
+### File uploads
+Client compresses to WebP (`lib/webp.ts`) → `POST /uploads/presign` → PUT to MinIO/S3 →
+store returned `key` in payload. Never send file bytes through the API.
+
+## Commands
+
+```sh
+pnpm install && cp .env.example .env
+docker compose -f docker-compose.dev.yaml up -d   # Postgres, Redis, MinIO
+pnpm db:generate && pnpm db:migrate
+pnpm --filter @repo/api dev      # :8000
+pnpm --filter @repo/admin dev    # :4000
+pnpm createsuperuser
+
+pnpm check:fix    # Biome lint+format (run before committing)
+pnpm typecheck    # all packages
+pnpm test         # vitest, per-package
+pnpm db:studio
+```
+
+Env is loaded from root `.env` via `dotenv -e` (`with-env` scripts) — don't add per-package
+`.env` files. Validate new env vars in `@repo/config` with Zod.
+
+---
+
+# UI / styling conventions
 
 ## Aesthetic direction
 
