@@ -3,7 +3,8 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { prisma } from "../../utils/prisma";
 import type { AuthVariables } from "../auth/middleware";
-import { requireRole, requireUser } from "../auth/middleware";
+import { requireRole, requireSuperAdmin, requireUser } from "../auth/middleware";
+import { getStageRoles, saveStageRoles, stageRolesSchema } from "./approvals";
 
 const settingsUpdateSchema = z.object({
   name: z.string().trim().min(1).max(150).optional(),
@@ -33,4 +34,17 @@ export const settingsRouter = new Hono<{ Variables: AuthVariables }>()
       data: { ...rest, ...(preferences ? { preferences: preferences as object } : {}) },
     });
     return c.json({ settings }, 200);
+  })
+  // Per-stage approval roles. Readable by any user (UI gates actions with it);
+  // writable only by super_admin.
+  .get("/approvals", async (c) => {
+    if (!requireUser(c)) return c.json({ error: "unauthorized" }, 401);
+    const approvals = await getStageRoles();
+    return c.json({ approvals }, 200);
+  })
+  .put("/approvals", zValidator("json", stageRolesSchema), async (c) => {
+    if (!requireSuperAdmin(c)) return c.json({ error: "forbidden" }, 403);
+    await saveStageRoles(c.req.valid("json"));
+    const approvals = await getStageRoles();
+    return c.json({ approvals }, 200);
   });

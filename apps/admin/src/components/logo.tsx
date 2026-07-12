@@ -10,11 +10,7 @@ export function SipLogo({ className }: { className?: string }) {
         className,
       )}
     >
-      <img
-        alt="NGO"
-        className="size-full object-contain"
-        src="/ngo_logo.svg"
-      />
+      <img alt="NGO" className="size-full object-contain" src="/ngo_logo.svg" />
     </span>
   );
 }

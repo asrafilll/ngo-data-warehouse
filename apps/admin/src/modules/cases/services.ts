@@ -11,6 +11,7 @@ export type CaseListQuery = InferRequestType<typeof casesIndex>["query"];
 export type CaseDetailResponse = InferResponseType<typeof caseDetail, 200>;
 export type CaseDetail = CaseDetailResponse["case"];
 export type CaseIntakeInput = InferRequestType<typeof api.cases.$post>["json"];
+export type CaseUpdateInput = InferRequestType<(typeof api.cases)[":id"]["$patch"]>["json"];
 export type VerificationInput = InferRequestType<
   (typeof api.cases)[":id"]["verification"]["$post"]
 >["json"];
@@ -26,6 +27,22 @@ export async function getCase(id: string) {
 
 export async function intakeCase(input: CaseIntakeInput) {
   const data = await unwrap<CaseDetailResponse>(await api.cases.$post({ json: input }));
+  return data.case;
+}
+
+// Perbaikan data pengajuan (needs_revision → submitted).
+export async function updateCase(id: string, input: CaseUpdateInput) {
+  const data = await unwrap<CaseDetailResponse>(
+    await api.cases[":id"].$patch({ param: { id }, json: input }),
+  );
+  return data.case;
+}
+
+// Buka kembali kasus yang ditolak.
+export async function reopenCase(id: string) {
+  const data = await unwrap<CaseDetailResponse>(
+    await api.cases[":id"].reopen.$post({ param: { id } }),
+  );
   return data.case;
 }
 
@@ -67,7 +84,8 @@ export async function decideCase(
   return data.case;
 }
 
-export async function disburseCase(id: string, input: { nominal: number; buktiKey: string }) {
+// nominal omitted on purpose: the API disburses the approved decisionNominal.
+export async function disburseCase(id: string, input: { buktiKey: string }) {
   const data = await unwrap<CaseDetailResponse>(
     await api.cases[":id"].disburse.$post({ param: { id }, json: { note: "", ...input } }),
   );

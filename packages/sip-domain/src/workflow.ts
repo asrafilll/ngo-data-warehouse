@@ -30,12 +30,13 @@ export const priorityLabels: Record<VerificationPriority, string> = {
   monitor: "Pantau",
 };
 
+// `approved` is intentionally absent: decision moves surveyed → disbursement_pending
+// directly, so the enum value only survives for legacy rows.
 export const workflowSteps: Array<{ status: WorkflowStatus; label: string }> = [
   { status: "submitted", label: "Pengajuan" },
   { status: "approved_for_verification", label: "Triase" },
   { status: "assigned", label: "Penugasan" },
   { status: "surveyed", label: "Verifikasi" },
-  { status: "approved", label: "Keputusan" },
   { status: "disbursement_pending", label: "Penyaluran" },
   { status: "completed", label: "Selesai" },
 ];

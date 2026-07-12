@@ -32,10 +32,23 @@ export async function getCurrentUser() {
 }
 
 export async function login(input: LoginInput) {
-  const { error } = await authClient.signIn.email(input);
-
-  if (error) {
-    throw new Error(error.message ?? "Authentication failed.");
+  if (input.identifier.includes("@")) {
+    const { error } = await authClient.signIn.email({
+      email: input.identifier,
+      password: input.password,
+    });
+    if (error) {
+      throw new Error(error.message ?? "Authentication failed.");
+    }
+  } else {
+    // Phone number → same account as approval-sip (sip.rekapdana.com).
+    const response = await apiClient.auth.external.login.$post({
+      json: { phoneNumber: input.identifier, password: input.password },
+    });
+    if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { message?: string } | null;
+      throw new Error(body?.message ?? "Authentication failed.");
+    }
   }
 
   return getCurrentUser();

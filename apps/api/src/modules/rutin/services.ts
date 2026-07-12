@@ -11,7 +11,7 @@ export async function getRoster(programId: string, period: string) {
       mustahik: {
         select: { name: true, nik: true, address: true, region: { select: { city: true } } },
       },
-      disbursements: { where: { period } },
+      disbursements: { where: { period, canceledAt: null } },
     },
     orderBy: { createdAt: "asc" },
   });
@@ -39,9 +39,12 @@ export async function addBeneficiary(input: z.infer<typeof beneficiaryCreateSche
   const mustahik = await prisma.mustahik.upsert({
     where: { nik: input.nik },
     update: { isRutin: true },
+    // Placeholder profile (roster only knows name + NIK). Flagged incomplete so it is
+    // visible in the master list and excluded from demographics until edited.
     create: {
       nik: input.nik,
       name: input.name,
+      profileComplete: false,
       age: 0,
       gender: "Laki-laki",
       maritalStatus: "Belum Menikah",
@@ -72,6 +75,8 @@ export async function addBeneficiary(input: z.infer<typeof beneficiaryCreateSche
   });
 }
 
+// Un-toggling soft-cancels the row (canceledAt/canceledBy) so the correction stays
+// auditable; re-toggling revives it.
 export async function setDisbursed(
   beneficiaryId: string,
   period: string,
@@ -81,11 +86,14 @@ export async function setDisbursed(
   if (disbursed) {
     await prisma.rutinDisbursement.upsert({
       where: { beneficiaryId_period: { beneficiaryId, period } },
-      update: {},
+      update: { canceledAt: null, canceledBy: "", actor, disbursedAt: new Date() },
       create: { beneficiaryId, period, actor },
     });
   } else {
-    await prisma.rutinDisbursement.deleteMany({ where: { beneficiaryId, period } });
+    await prisma.rutinDisbursement.updateMany({
+      where: { beneficiaryId, period, canceledAt: null },
+      data: { canceledAt: new Date(), canceledBy: actor },
+    });
   }
 }
 
@@ -98,6 +106,15 @@ export async function disburseAll(programId: string, period: string, actor: stri
   await prisma.rutinDisbursement.createMany({
     data: eligible.map((b) => ({ beneficiaryId: b.id, period, actor })),
     skipDuplicates: true,
+  });
+  // Revive rows that were previously canceled for this period.
+  await prisma.rutinDisbursement.updateMany({
+    where: {
+      period,
+      canceledAt: { not: null },
+      beneficiaryId: { in: eligible.map((b) => b.id) },
+    },
+    data: { canceledAt: null, canceledBy: "", actor, disbursedAt: new Date() },
   });
 
   return eligible.length;

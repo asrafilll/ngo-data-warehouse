@@ -12,13 +12,13 @@ export const Route = createFileRoute("/")({
 });
 
 function LoginPage() {
-  const [email, setEmail] = useState("admin@ngo.or.id");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const loginMutation = useLoginMutation();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    loginMutation.mutate({ email, password });
+    loginMutation.mutate({ identifier: identifier.trim(), password });
   }
 
   return (
@@ -29,9 +29,7 @@ function LoginPage() {
           <SipLogo className="size-11" />
           <span>
             <span className="block font-semibold text-sidebar-accent-foreground">SIM-M NGO</span>
-            <span className="block text-sidebar-foreground/70 text-xs">
-              Manajemen Bantuan
-            </span>
+            <span className="block text-sidebar-foreground/70 text-xs">Manajemen Bantuan</span>
           </span>
         </div>
 
@@ -45,9 +43,7 @@ function LoginPage() {
           </p>
         </div>
 
-        <p className="text-sidebar-foreground/60 text-xs">
-          © 2026 Manajemen Bantuan · Prototype
-        </p>
+        <p className="text-sidebar-foreground/60 text-xs">© 2026 Manajemen Bantuan · Prototype</p>
       </aside>
 
       {/* login form */}
@@ -68,16 +64,20 @@ function LoginPage() {
 
           <form className="mt-8 grid gap-4" onSubmit={handleSubmit}>
             <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="identifier">Email atau No. HP</Label>
               <Input
-                autoComplete="email"
-                id="email"
+                autoComplete="username"
+                id="identifier"
                 required
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="nama@ngo.or.id"
-                type="email"
-                value={email}
+                onChange={(e) => setIdentifier(e.target.value)}
+                placeholder="nama@ngo.or.id / 08xxxxxxxxxx"
+                type="text"
+                value={identifier}
               />
+              <p className="text-muted-foreground text-xs">
+                Punya akun SIP Approval (sip.rekapdana.com)? Masuk dengan No. HP dan password yang
+                sama.
+              </p>
             </div>
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
@@ -100,7 +100,7 @@ function LoginPage() {
             </div>
             {loginMutation.isError ? (
               <p className="rounded-lg border bg-muted px-3 py-2 text-destructive text-sm">
-                Email atau kata sandi tidak sesuai.
+                {loginMutation.error?.message || "Email/No. HP atau kata sandi tidak sesuai."}
               </p>
             ) : null}
             <Button className="mt-2 w-full" disabled={loginMutation.isPending} type="submit">

@@ -62,6 +62,16 @@ export const caseIntakeSchema = z.object({
   priority: z.enum(["urgent", "normal", "monitor"]).default("normal"),
 });
 
+// Perbaikan data pengajuan (status submitted/needs_revision). Everything optional —
+// only the provided sections are updated; the case always returns to `submitted`.
+export const caseUpdateSchema = z.object({
+  applicant: caseIntakeSchema.shape.applicant.optional(),
+  reporter: caseIntakeSchema.shape.reporter.optional(),
+  programId: z.string().min(1).optional(),
+  problem: z.string().trim().min(1).max(2000).optional(),
+  priority: z.enum(["urgent", "normal", "monitor"]).optional(),
+});
+
 // Triase (Pengurus): forward to verification, send back for revision, or reject.
 export const triageSchema = z.object({
   decision: z.enum(["approve", "needs_revision", "reject"]),
@@ -105,7 +115,9 @@ export const decisionSchema = z.object({
 });
 
 export const disburseSchema = z.object({
-  nominal: z.number().int().positive(),
+  // Optional — the service always disburses the approved decisionNominal and rejects
+  // a mismatching override.
+  nominal: z.number().int().positive().optional(),
   buktiKey: z.string().min(1, "Bukti foto penyaluran wajib diunggah"),
   note: z.string().trim().max(1000).default(""),
 });

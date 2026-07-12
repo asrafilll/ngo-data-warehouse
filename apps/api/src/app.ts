@@ -2,6 +2,7 @@ import { apiConfig } from "@repo/config";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { auth } from "./modules/auth/auth";
+import { externalAuthRouter } from "./modules/auth/external";
 import { type AuthVariables, loadAuthSession } from "./modules/auth/middleware";
 import { casesRouter } from "./modules/cases/router";
 import { donorsRouter } from "./modules/donors/router";
@@ -41,6 +42,7 @@ export const app = new Hono<{ Variables: AuthVariables }>()
   .on(["POST", "GET"], "/api/auth/*", (c) => {
     return auth.handler(c.req.raw);
   })
+  .route("/auth/external", externalAuthRouter)
   .route("/users", usersRouter)
   .route("/programs", programsRouter)
   .route("/regions", regionsRouter)

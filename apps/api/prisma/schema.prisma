@@ -163,6 +163,9 @@ model Mustahik {
   sktmStatus     String // "Belum ada" | "Bersedia mengurus" | "Sudah ada"
   infoSource     String         @default("")
   isRutin        Boolean        @default(false)
+  // False for placeholder rows created from the rutin roster (name + NIK only) so
+  // incomplete profiles are visible and excluded from demographic reporting.
+  profileComplete Boolean       @default(true)
   regionId       String?
   region         RegionalIndex? @relation(fields: [regionId], references: [id])
   createdAt      DateTime       @default(now())
@@ -312,6 +315,9 @@ model RutinDisbursement {
   period        String // "YYYY-MM"
   disbursedAt   DateTime         @default(now())
   actor         String           @default("")
+  // Un-toggling keeps the row (soft cancel) so corrections stay auditable.
+  canceledAt    DateTime?
+  canceledBy    String           @default("")
 
   @@unique([beneficiaryId, period])
   @@index([period])
@@ -329,6 +335,24 @@ model Donor {
   status            String    @default("Aktif") // Aktif | Perlu follow-up | Dormant
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
+
+  donations Donation[]
+}
+
+// Donation ledger — totalDonation/lastDonationAt on Donor are derived from these rows.
+model Donation {
+  id        String   @id @default(uuid())
+  donorId   String
+  donor     Donor    @relation(fields: [donorId], references: [id], onDelete: Cascade)
+  amount    Int
+  channel   String // Transfer Bank | QRIS | Tunai | Payroll
+  program   String   @default("Umum")
+  note      String   @default("")
+  donatedAt DateTime @default(now())
+  actor     String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([donorId])
 }
 
 // Singleton org profile + preferences (Pengaturan → Lembaga/Preferensi).

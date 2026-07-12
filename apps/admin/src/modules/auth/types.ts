@@ -7,8 +7,10 @@ export type AuthUser = {
   updatedAt: string;
 };
 
+// identifier: email (local better-auth account) or phone number (approval-sip /
+// sip.rekapdana.com account, verified via the external-auth bridge).
 export type LoginInput = {
-  email: string;
+  identifier: string;
   password: string;
 };
 

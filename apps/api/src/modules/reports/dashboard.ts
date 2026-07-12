@@ -18,7 +18,6 @@ const funnelSteps: Array<{ status: WorkflowStatus; label: string }> = [
   { status: "approved_for_verification", label: "Triase" },
   { status: "assigned", label: "Penugasan" },
   { status: "surveyed", label: "Verifikasi" },
-  { status: "approved", label: "Keputusan" },
   { status: "disbursement_pending", label: "Penyaluran" },
   { status: "completed", label: "Selesai" },
 ];
@@ -117,7 +116,7 @@ async function loadDashboardSource(currentPeriod: string) {
       include: {
         rutinBeneficiaries: {
           where: { active: true, since: { lte: currentPeriod } },
-          include: { disbursements: { where: { period: currentPeriod } } },
+          include: { disbursements: { where: { period: currentPeriod, canceledAt: null } } },
         },
       },
     }),

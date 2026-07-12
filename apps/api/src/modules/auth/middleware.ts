@@ -21,6 +21,11 @@ export function requireAdmin(c: Context<{ Variables: AuthVariables }>) {
   return requireRole(c, ["admin"]);
 }
 
+// Only super_admin passes (requireRole grants super_admin every role).
+export function requireSuperAdmin(c: Context<{ Variables: AuthVariables }>) {
+  return requireRole(c, []);
+}
+
 // SIP roles: super_admin | admin | pengurus | verifikator. super_admin passes every
 // guard. `role` is better-auth's comma-separated string.
 export function requireRole(c: Context<{ Variables: AuthVariables }>, roles: string[]) {

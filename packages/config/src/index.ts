@@ -47,6 +47,8 @@ const serverEnvSchema = z
     CLIENT_ORIGINS: z.string().trim().min(1).default(defaultClientOrigins),
     DATABASE_URL: z.string().trim().min(1).default(defaultDatabaseUrl),
     ENABLE_TELEMETRY: booleanSchema.default(false),
+    EXTERNAL_AUTH_API_KEY: optionalStringSchema,
+    EXTERNAL_AUTH_URL: optionalStringSchema,
     LOG_LEVEL: logLevelSchema,
     REDIS_URL: z.string().trim().min(1).default("redis://localhost:16379"),
     TELEMETRY_API_KEY: optionalStringSchema,
@@ -97,6 +99,14 @@ export const betterAuthConfig = {
 
 export const databaseConfig = {
   url: env.DATABASE_URL,
+} as const;
+
+// Account bridge to approval-sip (sip.rekapdana.com): users sign in here with the
+// same phone number + password. Disabled unless both vars are set.
+export const externalAuthConfig = {
+  apiKey: env.EXTERNAL_AUTH_API_KEY,
+  enabled: Boolean(env.EXTERNAL_AUTH_URL && env.EXTERNAL_AUTH_API_KEY),
+  url: env.EXTERNAL_AUTH_URL,
 } as const;
 
 export const redisConfig = {

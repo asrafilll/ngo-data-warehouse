@@ -1,4 +1,4 @@
-import type { Prisma, WorkflowStatus } from "@prisma/client";
+import { Prisma, type WorkflowStatus } from "@prisma/client";
 import type { z } from "zod";
 import { prisma } from "../../utils/prisma";
 import { calculateHadKifayah, toMonthlyIncome } from "./had-kifayah";
@@ -6,6 +6,7 @@ import type {
   assignSchema,
   caseIntakeSchema,
   casesQuerySchema,
+  caseUpdateSchema,
   decisionSchema,
   disburseSchema,
   triageSchema,
@@ -14,7 +15,13 @@ import type {
 
 export class CaseError extends Error {
   constructor(
-    public code: "not_found" | "invalid_transition" | "missing_nominal" | "verifier_not_found",
+    public code:
+      | "not_found"
+      | "invalid_transition"
+      | "missing_nominal"
+      | "verifier_not_found"
+      | "nominal_mismatch"
+      | "not_assigned",
     message: string,
   ) {
     super(message);
@@ -137,31 +144,96 @@ export async function intakeCase(
   });
 
   const pelapor = await prisma.pelapor.create({ data: reporter });
-  const caseNumber = await generateCaseNumber();
 
-  const created = await prisma.aidCase.create({
-    data: {
-      caseNumber,
-      aidType: "insidental",
-      programId: input.programId,
-      status: "submitted",
-      priority: input.priority,
-      problem: input.problem,
-      nextAction: nextActionByStatus.submitted,
-      mustahikId: mustahik.id,
-      pelaporId: pelapor.id,
-      submittedById: actor.id,
-      events: {
-        create: {
-          label: "Pengajuan dibuat",
-          actor: actor.name,
-          note: "Data awal pemohon dan pelapor dicatat.",
+  // The case number comes from a max-scan, so two concurrent intakes can race to the
+  // same number; retry on the unique-constraint violation.
+  let created: { id: string } | null = null;
+  for (let attempt = 0; attempt < 3 && !created; attempt++) {
+    const caseNumber = await generateCaseNumber();
+    try {
+      created = await prisma.aidCase.create({
+        data: {
+          caseNumber,
+          aidType: "insidental",
+          programId: input.programId,
+          status: "submitted",
+          priority: input.priority,
+          problem: input.problem,
+          nextAction: nextActionByStatus.submitted,
+          mustahikId: mustahik.id,
+          pelaporId: pelapor.id,
+          submittedById: actor.id,
+          events: {
+            create: {
+              label: "Pengajuan dibuat",
+              actor: actor.name,
+              note: "Data awal pemohon dan pelapor dicatat.",
+            },
+          },
         },
-      },
-    },
-  });
+        select: { id: true },
+      });
+    } catch (error) {
+      const isDuplicateNumber =
+        error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+      if (!isDuplicateNumber || attempt === 2) throw error;
+    }
+  }
+  if (!created) throw new Error("Gagal membuat nomor kasus.");
 
   return getCaseDetail(created.id);
+}
+
+// Perbaikan data pengajuan. Only allowed pre-verification; a needs_revision case goes
+// back to `submitted` so pengurus can re-triage the corrected data.
+export async function updateCase(
+  id: string,
+  input: z.infer<typeof caseUpdateSchema>,
+  actor: { name: string },
+) {
+  const row = await prisma.aidCase.findUnique({ where: { id } });
+  if (!row) throw new CaseError("not_found", "Kasus tidak ditemukan.");
+  assertStatus(row.status, ["submitted", "needs_revision"], "memperbaiki data pengajuan");
+
+  const { applicant, reporter } = input;
+
+  if (applicant) {
+    const region = applicant.regionCity
+      ? await prisma.regionalIndex.findUnique({ where: { city: applicant.regionCity } })
+      : null;
+    const { regionCity: _regionCity, ...mustahikData } = applicant;
+    await prisma.mustahik.update({
+      where: { id: row.mustahikId },
+      data: {
+        ...mustahikData,
+        rentCost: applicant.rentCost ?? null,
+        ...(region ? { regionId: region.id } : {}),
+      },
+    });
+  }
+
+  if (reporter && row.pelaporId) {
+    await prisma.pelapor.update({ where: { id: row.pelaporId }, data: reporter });
+  }
+
+  const wasRevision = row.status === "needs_revision";
+  return transition(
+    id,
+    {
+      ...(input.programId ? { program: { connect: { id: input.programId } } } : {}),
+      ...(input.problem !== undefined ? { problem: input.problem } : {}),
+      ...(input.priority ? { priority: input.priority } : {}),
+      status: "submitted",
+      nextAction: nextActionByStatus.submitted,
+    },
+    {
+      label: wasRevision ? "Pengajuan diperbaiki" : "Data pengajuan diperbarui",
+      actor: actor.name,
+      note: wasRevision
+        ? "Data dilengkapi dan diajukan ulang untuk triase."
+        : "Data pengajuan diperbarui sebelum triase.",
+    },
+  );
 }
 
 function assertStatus(current: WorkflowStatus, allowed: WorkflowStatus[], action: string) {
@@ -254,21 +326,32 @@ export async function assignVerifier(
   );
 }
 
+// An actor whose only SIP role is verifikator may act only on cases assigned to them;
+// admin/pengurus/super_admin may act on any case.
+function assertAssignedVerifier(
+  row: { assignedVerifierId: string | null },
+  actor: { id: string; roles: string[] },
+  action: string,
+) {
+  const elevated = actor.roles.some((role) => ["super_admin", "admin", "pengurus"].includes(role));
+  if (!elevated && row.assignedVerifierId !== actor.id) {
+    throw new CaseError("not_assigned", `Hanya verifikator yang ditugaskan bisa ${action}.`);
+  }
+}
+
 export async function submitVerification(
   id: string,
   input: z.infer<typeof verificationSchema>,
-  actor: { id: string; name: string },
+  actor: { id: string; name: string; roles: string[] },
 ) {
   const row = await prisma.aidCase.findUnique({
     where: { id },
     include: { mustahik: { include: { region: true } } },
   });
   if (!row) throw new CaseError("not_found", "Kasus tidak ditemukan.");
-  assertStatus(
-    row.status,
-    ["assigned", "approved_for_verification", "surveyed"],
-    "menyimpan verifikasi",
-  );
+  // Verification requires a prior assignment; `surveyed` stays allowed for corrections.
+  assertStatus(row.status, ["assigned", "surveyed"], "menyimpan verifikasi");
+  assertAssignedVerifier(row, actor, "mengisi verifikasi");
 
   const monthlyIncome = toMonthlyIncome(input.actualIncome, input.actualIncomePeriod);
   const hadKifayah = calculateHadKifayah({
@@ -362,15 +445,28 @@ export async function decideCase(
 export async function disburseCase(
   id: string,
   input: z.infer<typeof disburseSchema>,
-  actor: { name: string },
+  actor: { id: string; name: string; roles: string[] },
 ) {
   const row = await prisma.aidCase.findUnique({ where: { id } });
   if (!row) throw new CaseError("not_found", "Kasus tidak ditemukan.");
   assertStatus(row.status, ["disbursement_pending", "approved"], "menyalurkan bantuan");
+  assertAssignedVerifier(row, actor, "menyalurkan bantuan");
+
+  // The disbursed amount is the amount pengurus approved — no silent overrides.
+  const nominal = input.nominal ?? row.decisionNominal;
+  if (!nominal) {
+    throw new CaseError("missing_nominal", "Nominal penyaluran tidak ditemukan.");
+  }
+  if (row.decisionNominal && nominal !== row.decisionNominal) {
+    throw new CaseError(
+      "nominal_mismatch",
+      `Nominal penyaluran harus sama dengan keputusan pengurus (Rp ${row.decisionNominal.toLocaleString("id-ID")}).`,
+    );
+  }
 
   const disbursedAt = new Date();
   await prisma.disbursement.create({
-    data: { caseId: id, nominal: input.nominal, buktiKey: input.buktiKey, disbursedAt },
+    data: { caseId: id, nominal, buktiKey: input.buktiKey, disbursedAt },
   });
   await prisma.casePhoto.create({
     data: { caseId: id, kind: "penyaluran", label: "Bukti penyaluran", storageKey: input.buktiKey },
@@ -383,6 +479,34 @@ export async function disburseCase(
       label: "Bantuan disalurkan",
       actor: actor.name,
       note: input.note || "Bukti penyaluran tersimpan.",
+    },
+  );
+}
+
+// Koreksi keputusan: a rejected case can be reopened instead of forcing a brand-new
+// submission. It resumes at `surveyed` when a survey exists, otherwise at `submitted`.
+export async function reopenCase(id: string, actor: { name: string }) {
+  const row = await prisma.aidCase.findUnique({ where: { id }, include: { verification: true } });
+  if (!row) throw new CaseError("not_found", "Kasus tidak ditemukan.");
+  assertStatus(row.status, ["rejected"], "membuka kembali kasus");
+
+  const resumeAt: WorkflowStatus = row.verification?.verifiedAt ? "surveyed" : "submitted";
+  return transition(
+    id,
+    {
+      status: resumeAt,
+      nextAction: nextActionByStatus[resumeAt],
+      decidedAt: null,
+      decisionNominal: null,
+      decisionNote: null,
+    },
+    {
+      label: "Kasus dibuka kembali",
+      actor: actor.name,
+      note:
+        resumeAt === "surveyed"
+          ? "Kembali ke tahap keputusan; hasil verifikasi sebelumnya tetap berlaku."
+          : "Kembali ke tahap triase.",
     },
   );
 }

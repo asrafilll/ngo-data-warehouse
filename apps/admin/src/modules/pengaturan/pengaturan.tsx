@@ -30,18 +30,26 @@ import { cn } from "@repo/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
+import { meQueryOptions } from "../auth/hooks/use-auth";
 import {
+  approvalsQueryOptions,
   regionsQueryOptions,
   roleLabels,
   settingsQueryOptions,
+  type StageApprovals,
   useAmilMutations,
+  useApprovalsMutation,
   useRegionMutations,
   useSettingsMutation,
   usersQueryOptions,
   type SipRole,
+  type WorkflowStage,
 } from "./services";
 
 export function Pengaturan() {
+  const { data: me } = useQuery(meQueryOptions);
+  const isSuperAdmin = (me?.role ?? "").split(",").includes("super_admin");
+
   return (
     <div className="mx-auto grid max-w-[1440px] gap-6">
       <header>
@@ -57,6 +65,7 @@ export function Pengaturan() {
           <TabsTrigger value="pengguna">Pengguna</TabsTrigger>
           <TabsTrigger value="wilayah">Indeks Wilayah</TabsTrigger>
           <TabsTrigger value="preferensi">Preferensi</TabsTrigger>
+          {isSuperAdmin ? <TabsTrigger value="approval">Approval</TabsTrigger> : null}
         </TabsList>
 
         <TabsContent value="lembaga">
@@ -71,6 +80,11 @@ export function Pengaturan() {
         <TabsContent value="preferensi">
           <PreferensiTab />
         </TabsContent>
+        {isSuperAdmin ? (
+          <TabsContent value="approval">
+            <ApprovalTab />
+          </TabsContent>
+        ) : null}
       </Tabs>
     </div>
   );
@@ -542,6 +556,104 @@ function AddRegionDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const stageMeta: Array<{ stage: WorkflowStage; title: string; desc: string }> = [
+  { stage: "intake", title: "Pengajuan (Form 1)", desc: "Membuat & memperbaiki data pengajuan." },
+  { stage: "triage", title: "Triase", desc: "Lanjut verifikasi, revisi, atau tolak." },
+  { stage: "assign", title: "Penugasan", desc: "Menugaskan verifikator wilayah." },
+  { stage: "verification", title: "Verifikasi (Form 2)", desc: "Mengisi hasil survei lapangan." },
+  {
+    stage: "decision",
+    title: "Keputusan nominal",
+    desc: "Menyetujui / menolak dan menetapkan nominal.",
+  },
+  { stage: "disburse", title: "Penyaluran", desc: "Menyalurkan bantuan + bukti foto." },
+  { stage: "reopen", title: "Buka kembali", desc: "Membuka kasus yang ditolak." },
+];
+
+const assignableRoles: SipRole[] = ["admin", "pengurus", "verifikator"];
+
+// Super_admin only: choose which roles may perform each workflow stage. super_admin
+// itself always passes every guard, so it is not listed.
+function ApprovalTab() {
+  const { data: approvals } = useQuery(approvalsQueryOptions);
+  const mutation = useApprovalsMutation();
+  const [draft, setDraft] = useState<StageApprovals | null>(null);
+
+  useEffect(() => {
+    if (approvals) setDraft(approvals);
+  }, [approvals]);
+
+  if (!draft) return null;
+
+  const toggleRole = (stage: WorkflowStage, role: SipRole) => {
+    setDraft((prev) => {
+      if (!prev) return prev;
+      const current = prev[stage] ?? [];
+      const next = current.includes(role) ? current.filter((r) => r !== role) : [...current, role];
+      return { ...prev, [stage]: next };
+    });
+  };
+
+  const hasEmptyStage = stageMeta.some(({ stage }) => (draft[stage] ?? []).length === 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Approval per Tahap</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        <p className="text-muted-foreground text-sm">
+          Tentukan peran yang boleh melakukan aksi di tiap tahap alur bantuan insidental. Super
+          Admin selalu bisa melakukan semua aksi.
+        </p>
+        {stageMeta.map(({ stage, title, desc }) => (
+          <div
+            className="flex flex-wrap items-center justify-between gap-4 rounded-lg border p-4"
+            key={stage}
+          >
+            <div>
+              <p className="font-medium text-sm">{title}</p>
+              <p className="text-muted-foreground text-xs">{desc}</p>
+            </div>
+            <div className="flex gap-2">
+              {assignableRoles.map((role) => {
+                const active = (draft[stage] ?? []).includes(role);
+                return (
+                  <Button
+                    key={role}
+                    onClick={() => toggleRole(stage, role)}
+                    size="sm"
+                    type="button"
+                    variant={active ? "default" : "outline"}
+                  >
+                    {roleLabels[role]}
+                  </Button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        {hasEmptyStage ? (
+          <p className="text-destructive text-xs">Setiap tahap minimal punya satu peran.</p>
+        ) : null}
+        <div>
+          <Button
+            disabled={mutation.isPending || hasEmptyStage}
+            onClick={() =>
+              mutation.mutate(draft, {
+                onSuccess: () => toast.success("Pengaturan approval disimpan."),
+              })
+            }
+            type="button"
+          >
+            Simpan pengaturan approval
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

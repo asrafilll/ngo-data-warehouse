@@ -18,6 +18,14 @@ const donorCreateSchema = z.object({
 
 const donorUpdateSchema = donorCreateSchema.partial();
 
+const donationCreateSchema = z.object({
+  amount: z.number().int().positive(),
+  channel: z.enum(["Transfer Bank", "QRIS", "Tunai", "Payroll"]),
+  program: z.string().trim().max(100).default("Umum"),
+  note: z.string().trim().max(1000).default(""),
+  donatedAt: z.string().date().optional(),
+});
+
 const donorsQuerySchema = z.object({
   q: z.string().trim().optional(),
   status: z.string().trim().optional(),
@@ -101,5 +109,76 @@ export const donorsRouter = new Hono<{ Variables: AuthVariables }>()
   .delete("/:id", async (c) => {
     if (!requireRole(c, writerRoles)) return c.json({ error: "forbidden" }, 403);
     await prisma.donor.delete({ where: { id: c.req.param("id") } });
+    return c.json({ deleted: true }, 200);
+  })
+  // Donation ledger — totalDonation/lastDonationAt are derived from these rows so
+  // money-in reporting is transaction-backed.
+  .get("/:id/donations", async (c) => {
+    if (!requireUser(c)) return c.json({ error: "unauthorized" }, 401);
+    const donations = await prisma.donation.findMany({
+      where: { donorId: c.req.param("id") },
+      orderBy: { donatedAt: "desc" },
+    });
+    return c.json({ donations }, 200);
+  })
+  .post("/:id/donations", zValidator("json", donationCreateSchema), async (c) => {
+    const user = requireRole(c, writerRoles);
+    if (!user) return c.json({ error: "forbidden" }, 403);
+    const donorId = c.req.param("id");
+    const input = c.req.valid("json");
+    const donatedAt = input.donatedAt ? new Date(input.donatedAt) : new Date();
+
+    const donor = await prisma.donor.findUnique({ where: { id: donorId } });
+    if (!donor) return c.json({ error: "not_found" }, 404);
+
+    const [donation] = await prisma.$transaction([
+      prisma.donation.create({
+        data: {
+          donorId,
+          amount: input.amount,
+          channel: input.channel,
+          program: input.program,
+          note: input.note,
+          donatedAt,
+          actor: user.name,
+        },
+      }),
+      prisma.donor.update({
+        where: { id: donorId },
+        data: {
+          totalDonation: { increment: input.amount },
+          ...(!donor.lastDonationAt || donatedAt > donor.lastDonationAt
+            ? { lastDonationAt: donatedAt }
+            : {}),
+          status: "Aktif",
+        },
+      }),
+    ]);
+    return c.json({ donation }, 201);
+  })
+  // Koreksi salah input — reverses the donor totals in the same transaction.
+  .delete("/:id/donations/:donationId", async (c) => {
+    if (!requireRole(c, writerRoles)) return c.json({ error: "forbidden" }, 403);
+    const donation = await prisma.donation.findUnique({
+      where: { id: c.req.param("donationId") },
+    });
+    if (!donation || donation.donorId !== c.req.param("id")) {
+      return c.json({ error: "not_found" }, 404);
+    }
+    await prisma.$transaction(async (tx) => {
+      await tx.donation.delete({ where: { id: donation.id } });
+      const latest = await tx.donation.findFirst({
+        where: { donorId: donation.donorId },
+        orderBy: { donatedAt: "desc" },
+        select: { donatedAt: true },
+      });
+      await tx.donor.update({
+        where: { id: donation.donorId },
+        data: {
+          totalDonation: { decrement: donation.amount },
+          lastDonationAt: latest?.donatedAt ?? null,
+        },
+      });
+    });
     return c.json({ deleted: true }, 200);
   });

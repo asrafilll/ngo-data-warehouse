@@ -32,6 +32,35 @@ export function useSettingsMutation() {
   });
 }
 
+// ── Approval per tahap (super_admin only) ────────────────────────────────────
+
+const approvalsIndex = api.settings.approvals.$get;
+export type ApprovalsResponse = InferResponseType<typeof approvalsIndex, 200>;
+// Request shape is the canonical one (role-literal arrays) so the same type feeds the
+// editor draft and the PUT payload.
+export type StageApprovals = InferRequestType<typeof api.settings.approvals.$put>["json"];
+export type WorkflowStage = keyof StageApprovals;
+
+export const approvalsKey = ["settings", "approvals"] as const;
+
+export const approvalsQueryOptions = queryOptions({
+  queryKey: approvalsKey,
+  queryFn: async () => {
+    const data = await unwrap<ApprovalsResponse>(await api.settings.approvals.$get());
+    return data.approvals as StageApprovals;
+  },
+});
+
+export function useApprovalsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: StageApprovals) =>
+      unwrap<ApprovalsResponse>(await api.settings.approvals.$put({ json: input })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: approvalsKey }),
+    onError: (error) => toast.error(error.message),
+  });
+}
+
 // ── Amil users ───────────────────────────────────────────────────────────────
 
 const usersIndex = api.users.$get;

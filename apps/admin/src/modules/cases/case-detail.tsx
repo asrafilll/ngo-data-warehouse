@@ -27,8 +27,11 @@ import { EmptyState, FormField, Item, Line, Stepper } from "./case-detail-parts"
 import {
   caseQueryOptions,
   useAssignMutation,
+  useCaseUpdateMutation,
   useDecisionMutation,
   useDisburseMutation,
+  useReopenMutation,
+  useStagePermissions,
   useTriageMutation,
   useVerificationMutation,
 } from "./hooks";
@@ -116,69 +119,27 @@ export function CaseDetail({ caseId }: { caseId: string }) {
 // Stage-specific actions: triase (pengurus), penugasan verifikator. Keputusan nominal
 // lives in the Had Kifayah panel; penyaluran in its tab.
 function ActionPanel({ caseItem: c }: { caseItem: CaseDetailData }) {
-  const triage = useTriageMutation(c.id);
   const assign = useAssignMutation(c.id);
+  const { can } = useStagePermissions();
   const { data: verifiers = [] } = useQuery(
     usersQueryOptions({ role: "verifikator", active: true }),
   );
   const [verifierId, setVerifierId] = useState("");
 
+  if (c.status === "rejected" && can("reopen")) {
+    return <ReopenCard caseItem={c} />;
+  }
+
   if (c.status === "submitted" || c.status === "needs_revision") {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Triase Pengajuan</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-2">
-          <p className="text-muted-foreground text-xs">{c.nextAction}</p>
-          <Button
-            disabled={triage.isPending}
-            onClick={() =>
-              triage.mutate(
-                { decision: "approve" },
-                { onSuccess: () => toast.success("Kasus diteruskan untuk verifikasi.") },
-              )
-            }
-            type="button"
-          >
-            Setujui untuk verifikasi
-          </Button>
-          <div className="grid grid-cols-2 gap-2">
-            {c.status !== "needs_revision" ? (
-              <Button
-                disabled={triage.isPending}
-                onClick={() =>
-                  triage.mutate(
-                    { decision: "needs_revision" },
-                    { onSuccess: () => toast("Dikembalikan untuk revisi.") },
-                  )
-                }
-                type="button"
-                variant="outline"
-              >
-                Minta revisi
-              </Button>
-            ) : null}
-            <Button
-              disabled={triage.isPending}
-              onClick={() =>
-                triage.mutate(
-                  { decision: "reject" },
-                  { onSuccess: () => toast("Pengajuan ditolak.") },
-                )
-              }
-              type="button"
-              variant="outline"
-            >
-              Tolak
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <>
+        {c.status === "needs_revision" && can("intake") ? <RevisionCard caseItem={c} /> : null}
+        {can("triage") ? <TriageCard caseItem={c} /> : null}
+      </>
     );
   }
 
-  if (c.status === "approved_for_verification" || c.status === "assigned") {
+  if ((c.status === "approved_for_verification" || c.status === "assigned") && can("assign")) {
     return (
       <Card>
         <CardHeader>
@@ -215,6 +176,142 @@ function ActionPanel({ caseItem: c }: { caseItem: CaseDetailData }) {
   }
 
   return null;
+}
+
+function TriageCard({ caseItem: c }: { caseItem: CaseDetailData }) {
+  const triage = useTriageMutation(c.id);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Triase Pengajuan</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-2">
+        <p className="text-muted-foreground text-xs">{c.nextAction}</p>
+        <Button
+          disabled={triage.isPending}
+          onClick={() =>
+            triage.mutate(
+              { decision: "approve" },
+              { onSuccess: () => toast.success("Kasus diteruskan untuk verifikasi.") },
+            )
+          }
+          type="button"
+        >
+          Setujui untuk verifikasi
+        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          {c.status !== "needs_revision" ? (
+            <Button
+              disabled={triage.isPending}
+              onClick={() =>
+                triage.mutate(
+                  { decision: "needs_revision" },
+                  { onSuccess: () => toast("Dikembalikan untuk revisi.") },
+                )
+              }
+              type="button"
+              variant="outline"
+            >
+              Minta revisi
+            </Button>
+          ) : null}
+          <Button
+            disabled={triage.isPending}
+            onClick={() =>
+              triage.mutate(
+                { decision: "reject" },
+                { onSuccess: () => toast("Pengajuan ditolak.") },
+              )
+            }
+            type="button"
+            variant="outline"
+          >
+            Tolak
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Perbaikan data pengajuan saat status Perlu Revisi: koreksi masalah, program, dan
+// prioritas lalu ajukan ulang (kembali ke triase). Data pemohon lengkap bisa
+// dikoreksi lewat master Mustahik.
+function RevisionCard({ caseItem: c }: { caseItem: CaseDetailData }) {
+  const update = useCaseUpdateMutation(c.id);
+  const [problem, setProblem] = useState(c.problem);
+  const [priority, setPriority] = useState(c.priority);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Perbaiki Pengajuan</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        <p className="text-muted-foreground text-xs">{c.nextAction}</p>
+        <FormField htmlFor="rev-problem" label="Masalah yang dihadapi">
+          <Textarea
+            id="rev-problem"
+            onChange={(e) => setProblem(e.target.value)}
+            rows={4}
+            value={problem}
+          />
+        </FormField>
+        <FormField htmlFor="rev-priority" label="Prioritas">
+          <NativeSelect
+            id="rev-priority"
+            onChange={(e) => setPriority(e.target.value as typeof c.priority)}
+            value={priority}
+          >
+            <NativeSelectOption value="urgent">Prioritas</NativeSelectOption>
+            <NativeSelectOption value="normal">Normal</NativeSelectOption>
+            <NativeSelectOption value="monitor">Pantau</NativeSelectOption>
+          </NativeSelect>
+        </FormField>
+        <Button
+          disabled={update.isPending || !problem.trim()}
+          onClick={() =>
+            update.mutate(
+              { problem: problem.trim(), priority },
+              { onSuccess: () => toast.success("Pengajuan diperbaiki dan diajukan ulang.") },
+            )
+          }
+          type="button"
+        >
+          Ajukan ulang
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Koreksi keputusan: buka kembali kasus yang ditolak.
+function ReopenCard({ caseItem: c }: { caseItem: CaseDetailData }) {
+  const reopen = useReopenMutation(c.id);
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Kasus Ditolak</CardTitle>
+      </CardHeader>
+      <CardContent className="grid gap-2">
+        <p className="text-muted-foreground text-xs">
+          Salah tolak? Kasus bisa dibuka kembali dan lanjut dari tahap terakhirnya.
+        </p>
+        <Button
+          disabled={reopen.isPending}
+          onClick={() =>
+            reopen.mutate(undefined, {
+              onSuccess: () => toast.success("Kasus dibuka kembali."),
+            })
+          }
+          type="button"
+          variant="outline"
+        >
+          Buka kembali kasus
+        </Button>
+      </CardContent>
+    </Card>
+  );
 }
 
 function PemohonTab({ caseItem: c }: { caseItem: CaseDetailData }) {
@@ -273,7 +370,12 @@ function PemohonTab({ caseItem: c }: { caseItem: CaseDetailData }) {
 
 function VerifikasiTab({ caseItem: c }: { caseItem: CaseDetailData }) {
   const v = c.verification;
-  const canEdit = c.status === "assigned" || c.status === "approved_for_verification";
+  const { can, isElevated, meId } = useStagePermissions();
+  // Form 2 requires an assignment first; a plain verifikator only edits their own case.
+  const canEdit =
+    c.status === "assigned" &&
+    can("verification") &&
+    (isElevated || c.assignedVerifier?.id === meId);
 
   if (!v && !canEdit) {
     return (
@@ -524,7 +626,11 @@ function VerificationForm({ caseItem: c }: { caseItem: CaseDetailData }) {
 }
 
 function PenyaluranTab({ caseItem: c }: { caseItem: CaseDetailData }) {
-  const canDisburse = c.status === "disbursement_pending" || c.status === "approved";
+  const { can, isElevated, meId } = useStagePermissions();
+  const canDisburse =
+    (c.status === "disbursement_pending" || c.status === "approved") &&
+    can("disburse") &&
+    (isElevated || c.assignedVerifier?.id === meId);
   if (!c.disbursement && !canDisburse) {
     return (
       <EmptyState text="Belum ada penyaluran. Tahap ini aktif setelah pengurus menyetujui nominal bantuan." />
@@ -571,7 +677,6 @@ function PenyaluranTab({ caseItem: c }: { caseItem: CaseDetailData }) {
 // the upload is what closes the case.
 function DisburseForm({ caseItem: c }: { caseItem: CaseDetailData }) {
   const mutation = useDisburseMutation(c.id);
-  const [nominal, setNominal] = useState(String(c.decisionNominal ?? ""));
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -585,7 +690,7 @@ function DisburseForm({ caseItem: c }: { caseItem: CaseDetailData }) {
     try {
       const buktiKey = await uploadCasePhoto(c.id, "penyaluran", file);
       mutation.mutate(
-        { nominal: Number(nominal) || 0, buktiKey },
+        { buktiKey },
         { onSuccess: () => toast.success("Bantuan disalurkan. Kasus selesai.") },
       );
     } catch (error) {
@@ -606,14 +711,13 @@ function DisburseForm({ caseItem: c }: { caseItem: CaseDetailData }) {
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <FormField htmlFor="d-nominal" label="Nominal disalurkan">
             <Input
+              disabled
               id="d-nominal"
-              inputMode="numeric"
-              onChange={(e) => setNominal(e.target.value.replace(/\D/g, ""))}
-              value={nominal}
+              readOnly
+              value={c.decisionNominal ? formatCurrency(c.decisionNominal) : "—"}
             />
             <p className="text-muted-foreground text-xs">
-              Keputusan pengurus:{" "}
-              {c.decisionNominal ? formatCurrency(c.decisionNominal) : "belum ditetapkan"}
+              Mengikuti keputusan pengurus — tidak bisa diubah saat penyaluran.
             </p>
           </FormField>
           <FormField htmlFor="d-bukti" label="Bukti foto serah terima">
@@ -628,7 +732,7 @@ function DisburseForm({ caseItem: c }: { caseItem: CaseDetailData }) {
             </p>
           </FormField>
           <div className="sm:col-span-2">
-            <Button disabled={busy || !nominal} type="submit">
+            <Button disabled={busy || !file} type="submit">
               <Upload className="size-4" strokeWidth={1.8} />
               {busy ? "Menyalurkan…" : "Salurkan & tutup kasus"}
             </Button>
@@ -644,7 +748,8 @@ function HadKifayahPanel({ caseItem: c }: { caseItem: CaseDetailData }) {
   const decision = useDecisionMutation(c.id);
   const [nominal, setNominal] = useState(String(hk.recommendedAid));
   const componentMax = Math.max(...hk.components.map((x) => x.amount), 1);
-  const canDecide = c.status === "surveyed";
+  const { can } = useStagePermissions();
+  const canDecide = c.status === "surveyed" && can("decision");
 
   return (
     <Card>
