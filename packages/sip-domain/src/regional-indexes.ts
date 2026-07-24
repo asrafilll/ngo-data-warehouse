@@ -1,6 +1,6 @@
 import type { RegionalIndex } from "./types";
 
-// Mock Had Kifayah regional reference data for the NGO admin prototype.
+// Mock Had Kifayah regional reference data for the SIP admin prototype.
 export const regionalIndexes: RegionalIndex[] = [
   {
     id: "reg-bks",

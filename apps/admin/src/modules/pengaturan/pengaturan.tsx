@@ -309,7 +309,7 @@ function AddUserDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Tambah pengguna</DialogTitle>
-          <DialogDescription>Akun amil baru dengan peran NGO.</DialogDescription>
+          <DialogDescription>Akun amil baru dengan peran SIP.</DialogDescription>
         </DialogHeader>
         <form className="grid gap-4" id="add-user-form" onSubmit={handleSubmit}>
           <div className="grid gap-2">

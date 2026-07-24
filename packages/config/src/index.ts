@@ -49,6 +49,7 @@ const serverEnvSchema = z
     ENABLE_TELEMETRY: booleanSchema.default(false),
     EXTERNAL_AUTH_API_KEY: optionalStringSchema,
     EXTERNAL_AUTH_URL: optionalStringSchema,
+    INTERNAL_API_URL: z.string().trim().url().default("http://localhost:8000"),
     LOG_LEVEL: logLevelSchema,
     REDIS_URL: z.string().trim().min(1).default("redis://localhost:16379"),
     TELEMETRY_API_KEY: optionalStringSchema,
@@ -56,6 +57,9 @@ const serverEnvSchema = z
     TELEMETRY_EXPORTER: telemetryExporterSchema,
     TELEMETRY_EXPORTER_OTLP_ENDPOINT: optionalStringSchema,
     TELEMETRY_SERVICE_NAMESPACE: optionalStringSchema,
+    USER_SYNC_API_KEY: optionalStringSchema,
+    USER_SYNC_CRON: z.string().trim().min(1).default("0 2 * * *"),
+    USER_SYNC_TIMEZONE: z.string().trim().min(1).default("Asia/Jakarta"),
   })
   .superRefine((env, context) => {
     const betterAuthSecret = env.BETTER_AUTH_SECRET ?? env.AUTH_SECRET ?? "dev-change-me";
@@ -107,6 +111,14 @@ export const externalAuthConfig = {
   apiKey: env.EXTERNAL_AUTH_API_KEY,
   enabled: Boolean(env.EXTERNAL_AUTH_URL && env.EXTERNAL_AUTH_API_KEY),
   url: env.EXTERNAL_AUTH_URL,
+} as const;
+
+export const userSyncConfig = {
+  apiKey: env.USER_SYNC_API_KEY,
+  cron: env.USER_SYNC_CRON,
+  enabled: Boolean(env.USER_SYNC_API_KEY),
+  internalApiUrl: env.INTERNAL_API_URL,
+  timezone: env.USER_SYNC_TIMEZONE,
 } as const;
 
 export const redisConfig = {

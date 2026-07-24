@@ -2,10 +2,10 @@ sip.asrafil.dev {
     reverse_proxy 127.0.0.1:4000
 }
 
-api.sip.asrafil.dev {
-    reverse_proxy 127.0.0.1:8000
+api-sip.asrafil.dev {
+    reverse_proxy 127.0.0.1:8100
 }
 
-minio.sip.asrafil.dev {
+minio-sip.asrafil.dev {
     reverse_proxy 127.0.0.1:9000
 }

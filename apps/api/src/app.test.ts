@@ -11,4 +11,11 @@ describe("api app", () => {
     });
     expect(response.status).toBe(200);
   });
+
+  it("protects manual approval SIP user sync", async () => {
+    const response = await app.request("/users/sync");
+
+    await expect(response.json()).resolves.toEqual({ error: "forbidden" });
+    expect(response.status).toBe(403);
+  });
 });

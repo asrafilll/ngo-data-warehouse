@@ -8,4 +8,4 @@ startTelemetry({
 
 const { runWorker } = await import("./index");
 
-runWorker();
+await runWorker();

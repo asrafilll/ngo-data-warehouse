@@ -83,6 +83,8 @@ services:
       CLIENT_ORIGINS: "${CLIENT_ORIGINS:-http://localhost:3000,http://localhost:4000}"
       DATABASE_URL: "${DOCKER_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/monorepo_template?schema=public}"
       ENABLE_TELEMETRY: "${ENABLE_TELEMETRY:-false}"
+      EXTERNAL_AUTH_API_KEY: "${EXTERNAL_AUTH_API_KEY:?Set EXTERNAL_AUTH_API_KEY}"
+      EXTERNAL_AUTH_URL: "${EXTERNAL_AUTH_URL:-https://sip.rekapdana.com}"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       REDIS_URL: "${DOCKER_REDIS_URL:-redis://redis:6379}"
       S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:?Set S3_ACCESS_KEY_ID}"
@@ -97,8 +99,9 @@ services:
       TELEMETRY_EXPORTER: "${TELEMETRY_EXPORTER:-console}"
       TELEMETRY_EXPORTER_OTLP_ENDPOINT: "${TELEMETRY_EXPORTER_OTLP_ENDPOINT:-}"
       TELEMETRY_SERVICE_NAMESPACE: "${TELEMETRY_SERVICE_NAMESPACE:-monorepo-template}"
+      USER_SYNC_API_KEY: "${USER_SYNC_API_KEY:?Set USER_SYNC_API_KEY}"
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${API_HOST_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,7 +119,7 @@ services:
       NODE_ENV: "${NODE_ENV:-production}"
       VITE_API_URL: "${VITE_API_URL:-http://localhost:8000}"
     ports:
-      - "127.0.0.1:4000:4000"
+      - "127.0.0.1:${ADMIN_HOST_PORT:-4000}:4000"
     depends_on:
       api:
         condition: service_started
@@ -133,6 +136,7 @@ services:
       CLIENT_ORIGINS: "${CLIENT_ORIGINS:-http://localhost:3000,http://localhost:4000}"
       DATABASE_URL: "${DOCKER_DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/monorepo_template?schema=public}"
       ENABLE_TELEMETRY: "${ENABLE_TELEMETRY:-false}"
+      INTERNAL_API_URL: "http://api:8000"
       LOG_LEVEL: "${LOG_LEVEL:-info}"
       REDIS_URL: "${DOCKER_REDIS_URL:-redis://redis:6379}"
       S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:-}"
@@ -147,7 +151,12 @@ services:
       TELEMETRY_EXPORTER: "${TELEMETRY_EXPORTER:-console}"
       TELEMETRY_EXPORTER_OTLP_ENDPOINT: "${TELEMETRY_EXPORTER_OTLP_ENDPOINT:-}"
       TELEMETRY_SERVICE_NAMESPACE: "${TELEMETRY_SERVICE_NAMESPACE:-monorepo-template}"
+      USER_SYNC_API_KEY: "${USER_SYNC_API_KEY:?Set USER_SYNC_API_KEY}"
+      USER_SYNC_CRON: "${USER_SYNC_CRON:-0 2 * * *}"
+      USER_SYNC_TIMEZONE: "${USER_SYNC_TIMEZONE:-Asia/Jakarta}"
     depends_on:
+      api:
+        condition: service_started
       postgres:
         condition: service_healthy
       redis:

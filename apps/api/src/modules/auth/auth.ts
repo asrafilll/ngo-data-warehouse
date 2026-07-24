@@ -5,7 +5,7 @@ import { admin } from "better-auth/plugins";
 import { prisma } from "../../utils/prisma";
 
 export const auth = betterAuth({
-  appName: "Monorepo Template",
+  appName: "SIP Manajemen",
   baseURL: betterAuthConfig.url,
   database: prismaAdapter(prisma, {
     provider: "postgresql",
