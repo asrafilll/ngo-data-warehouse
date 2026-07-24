@@ -84,52 +84,27 @@ jobs:
   deploy:
     name: Deploy production
     needs: verify
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    if: github.repository == 'asrafilll/ngo-data-warehouse' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, sip-production]
     timeout-minutes: 30
     environment:
       name: production
       url: https://sip.asrafil.dev
     env:
-      PROD_HOST: ${{ vars.PROD_HOST }}
       PROD_PATH: ${{ vars.PROD_PATH }}
-      PROD_PORT: ${{ vars.PROD_PORT }}
-      PROD_USER: ${{ vars.PROD_USER }}
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
-      - name: Configure production SSH
-        env:
-          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
-          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          : "${PROD_SSH_PRIVATE_KEY:?Missing PROD_SSH_PRIVATE_KEY}"
-          : "${PROD_SSH_KNOWN_HOSTS:?Missing PROD_SSH_KNOWN_HOSTS}"
-
-          umask 077
-          mkdir -p "$HOME/.ssh"
-          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/sip-production"
-          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
 
       - name: Deploy exact commit
         shell: bash
         run: |
           set -Eeuo pipefail
-          : "${PROD_HOST:?Missing PROD_HOST}"
           : "${PROD_PATH:?Missing PROD_PATH}"
-          : "${PROD_PORT:?Missing PROD_PORT}"
-          : "${PROD_USER:?Missing PROD_USER}"
 
-          [[ "$PROD_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
           [[ "$PROD_PATH" =~ ^/home/[A-Za-z0-9_-]+/apps/sip-manajemen$ ]]
-          [[ "$PROD_PORT" =~ ^[0-9]+$ ]]
-          [[ "$PROD_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]
-
-          deploy_target="${PROD_USER}@${PROD_HOST}"
-          ssh_command="ssh -i $HOME/.ssh/sip-production -p $PROD_PORT -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+          [[ "$(id -un)" == "kiddie" ]]
+          [[ -f "$PROD_PATH/.env.production" ]]
 
           rsync -az --delete-delay \
             --filter='P /.env.production' \
@@ -144,14 +119,7 @@ jobs:
             --exclude='dist/' \
             --exclude='build/' \
             --exclude='coverage/' \
-            -e "$ssh_command" \
-            ./ "${deploy_target}:${PROD_PATH}/"
+            ./ "$PROD_PATH/"
 
-          ssh \
-            -i "$HOME/.ssh/sip-production" \
-            -p "$PROD_PORT" \
-            -o BatchMode=yes \
-            -o IdentitiesOnly=yes \
-            -o StrictHostKeyChecking=yes \
-            "$deploy_target" \
-            "cd '$PROD_PATH' && DEPLOY_SHA='$GITHUB_SHA' bash scripts/deploy-production.sh"
+          cd "$PROD_PATH"
+          DEPLOY_SHA="$GITHUB_SHA" bash scripts/deploy-production.sh

@@ -149,10 +149,11 @@ Deployment menyimpan `.env.production` hanya di server, menjalankan
 `prisma migrate deploy`, lalu membuat ulang container API, admin, dan worker. PostgreSQL,
 Redis, dan MinIO tidak dimulai ulang pada setiap perubahan aplikasi.
 
-Konfigurasi GitHub environment `production`:
-
-- Secrets: `PROD_SSH_PRIVATE_KEY`, `PROD_SSH_KNOWN_HOSTS`
-- Variables: `PROD_HOST`, `PROD_USER`, `PROD_PORT`, `PROD_PATH`
+Job deployment menggunakan repository-scoped self-hosted runner berlabel
+`sip-production` di server. Runner hanya menerima job deployment setelah pemeriksaan
+push `main` berhasil. GitHub environment `production` hanya memerlukan variable
+`PROD_PATH`; kredensial aplikasi tetap berada di `.env.production` dengan mode `600`
+dan tidak disimpan di GitHub.
 
 Seluruh perubahan `schema.prisma` wajib disertai migration SQL di
 `apps/api/prisma/migrations`. CI akan menolak deployment bila keduanya tidak sinkron.
