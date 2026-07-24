@@ -1,4 +1,4 @@
-// Entry point — NGO console login. Standalone page, rendered outside the app shell.
+// Entry point — SIP console login. Standalone page, rendered outside the app shell.
 import { Button } from "@repo/ui/components/button";
 import { Input } from "@repo/ui/components/input";
 import { Label } from "@repo/ui/components/label";
@@ -28,8 +28,10 @@ function LoginPage() {
         <div className="flex items-center gap-3">
           <SipLogo className="size-11" />
           <span>
-            <span className="block font-semibold text-sidebar-accent-foreground">SIM-M NGO</span>
-            <span className="block text-sidebar-foreground/70 text-xs">Manajemen Bantuan</span>
+            <span className="block font-semibold text-sidebar-accent-foreground">SIM-M SIP</span>
+            <span className="block text-sidebar-foreground/70 text-xs">
+              Solidaritas Insan Peduli
+            </span>
           </span>
         </div>
 
@@ -43,7 +45,9 @@ function LoginPage() {
           </p>
         </div>
 
-        <p className="text-sidebar-foreground/60 text-xs">© 2026 Manajemen Bantuan · Prototype</p>
+        <p className="text-sidebar-foreground/60 text-xs">
+          © 2026 Solidaritas Insan Peduli · Prototype
+        </p>
       </aside>
 
       {/* login form */}
@@ -52,8 +56,8 @@ function LoginPage() {
           <div className="mb-8 flex items-center gap-3 lg:hidden">
             <SipLogo className="size-10" />
             <span>
-              <span className="block font-semibold text-sm">SIM-M NGO</span>
-              <span className="block text-muted-foreground text-xs">Manajemen Bantuan</span>
+              <span className="block font-semibold text-sm">SIM-M SIP</span>
+              <span className="block text-muted-foreground text-xs">Solidaritas Insan Peduli</span>
             </span>
           </div>
 
@@ -70,7 +74,7 @@ function LoginPage() {
                 id="identifier"
                 required
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="nama@ngo.or.id / 08xxxxxxxxxx"
+                placeholder="nama@sip.or.id / 08xxxxxxxxxx"
                 type="text"
                 value={identifier}
               />

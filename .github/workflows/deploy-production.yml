@@ -1,0 +1,154 @@
+name: CI and deploy production
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sip-manajemen-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: sip_ci
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d sip_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/sip_ci?schema=public
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting and lint
+        run: pnpm check
+
+      - name: Check types
+        run: pnpm typecheck
+
+      - name: Run tests
+        env:
+          NODE_ENV: test
+        run: pnpm test
+
+      - name: Build applications
+        run: pnpm build
+
+      - name: Apply migrations to the CI database
+        run: pnpm --filter @repo/api exec prisma migrate deploy
+
+      - name: Reject Prisma schema drift
+        run: >-
+          pnpm --filter @repo/api exec prisma migrate diff
+          --from-config-datasource
+          --to-schema prisma/schema.prisma
+          --exit-code
+
+      - name: Reject critical dependency vulnerabilities
+        run: pnpm audit --audit-level=critical
+
+  deploy:
+    name: Deploy production
+    needs: verify
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://sip.asrafil.dev
+    env:
+      PROD_HOST: ${{ vars.PROD_HOST }}
+      PROD_PATH: ${{ vars.PROD_PATH }}
+      PROD_PORT: ${{ vars.PROD_PORT }}
+      PROD_USER: ${{ vars.PROD_USER }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Configure production SSH
+        env:
+          PROD_SSH_KNOWN_HOSTS: ${{ secrets.PROD_SSH_KNOWN_HOSTS }}
+          PROD_SSH_PRIVATE_KEY: ${{ secrets.PROD_SSH_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          : "${PROD_SSH_PRIVATE_KEY:?Missing PROD_SSH_PRIVATE_KEY}"
+          : "${PROD_SSH_KNOWN_HOSTS:?Missing PROD_SSH_KNOWN_HOSTS}"
+
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$PROD_SSH_PRIVATE_KEY" > "$HOME/.ssh/sip-production"
+          printf '%s\n' "$PROD_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+
+      - name: Deploy exact commit
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          : "${PROD_HOST:?Missing PROD_HOST}"
+          : "${PROD_PATH:?Missing PROD_PATH}"
+          : "${PROD_PORT:?Missing PROD_PORT}"
+          : "${PROD_USER:?Missing PROD_USER}"
+
+          [[ "$PROD_HOST" =~ ^[A-Za-z0-9.-]+$ ]]
+          [[ "$PROD_PATH" =~ ^/home/[A-Za-z0-9_-]+/apps/sip-manajemen$ ]]
+          [[ "$PROD_PORT" =~ ^[0-9]+$ ]]
+          [[ "$PROD_USER" =~ ^[A-Za-z_][A-Za-z0-9_-]*$ ]]
+
+          deploy_target="${PROD_USER}@${PROD_HOST}"
+          ssh_command="ssh -i $HOME/.ssh/sip-production -p $PROD_PORT -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes"
+
+          rsync -az --delete-delay \
+            --filter='P /.env.production' \
+            --exclude='/.env' \
+            --exclude='/.env.production' \
+            --exclude='/.git/' \
+            --exclude='/.agents/' \
+            --exclude='/.codex/' \
+            --exclude='/.lexa/' \
+            --exclude='/docs/untracked/' \
+            --exclude='node_modules/' \
+            --exclude='dist/' \
+            --exclude='build/' \
+            --exclude='coverage/' \
+            -e "$ssh_command" \
+            ./ "${deploy_target}:${PROD_PATH}/"
+
+          ssh \
+            -i "$HOME/.ssh/sip-production" \
+            -p "$PROD_PORT" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            -o StrictHostKeyChecking=yes \
+            "$deploy_target" \
+            "cd '$PROD_PATH' && DEPLOY_SHA='$GITHUB_SHA' bash scripts/deploy-production.sh"

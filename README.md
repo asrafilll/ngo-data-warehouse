@@ -117,3 +117,42 @@ Port lokal bawaan:
 ## Catatan Teknis Singkat
 
 Repository ini berisi aplikasi admin web, API, worker, database schema, shared UI, dan domain helpers. Detail teknis sengaja dijaga ringkas di README ini karena dokumen utama ditujukan untuk memahami nilai bisnis, modul, dan alur kerja aplikasi.
+
+## Sinkronisasi Pengguna SIP Approval
+
+Worker menyinkronkan direktori pengguna dari SIP Approval setiap hari pukul 02.00
+`Asia/Jakarta`. Jadwal dapat diubah melalui `USER_SYNC_CRON` dan
+`USER_SYNC_TIMEZONE`.
+
+Konfigurasikan `EXTERNAL_AUTH_API_KEY` dengan kunci yang sama seperti
+`EXTERNAL_API_KEY` di SIP Approval. Gunakan kunci internal terpisah untuk
+`USER_SYNC_API_KEY`.
+
+Sinkronisasi juga dapat dijalankan secara manual:
+
+```sh
+curl -H "x-user-sync-key: $USER_SYNC_API_KEY" \
+  https://api-sip.asrafil.dev/users/sync
+```
+
+Endpoint tersebut menggunakan metode `GET`, tidak dapat di-cache, dan hanya menerima
+kunci sinkronisasi atau sesi `super_admin`.
+
+## CI/CD Produksi
+
+Push ke branch `main` menjalankan `.github/workflows/deploy-production.yml`.
+Workflow memeriksa format, tipe, tes, build, histori migrasi Prisma, dan dependency
+critical sebelum mengirim commit yang tepat ke server produksi. Pull request ke `main`
+menjalankan pemeriksaan yang sama tanpa melakukan deployment.
+
+Deployment menyimpan `.env.production` hanya di server, menjalankan
+`prisma migrate deploy`, lalu membuat ulang container API, admin, dan worker. PostgreSQL,
+Redis, dan MinIO tidak dimulai ulang pada setiap perubahan aplikasi.
+
+Konfigurasi GitHub environment `production`:
+
+- Secrets: `PROD_SSH_PRIVATE_KEY`, `PROD_SSH_KNOWN_HOSTS`
+- Variables: `PROD_HOST`, `PROD_USER`, `PROD_PORT`, `PROD_PATH`
+
+Seluruh perubahan `schema.prisma` wajib disertai migration SQL di
+`apps/api/prisma/migrations`. CI akan menolak deployment bila keduanya tidak sinkron.

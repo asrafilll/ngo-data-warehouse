@@ -22,18 +22,28 @@ export type CreateLoggerOptions = LoggerConfig & {
 };
 
 export const redactedLogPaths = [
+  "apiKey",
   "authorization",
   "cookie",
   "password",
   "passwordHash",
+  "x-api-key",
+  "x-user-sync-key",
   "req.headers.authorization",
   "req.headers.cookie",
+  "req.headers.x-api-key",
+  "req.headers.x-user-sync-key",
   "request.headers.authorization",
   "request.headers.cookie",
+  "request.headers.x-api-key",
+  "request.headers.x-user-sync-key",
+  "*.apiKey",
   "*.authorization",
   "*.cookie",
   "*.password",
   "*.passwordHash",
+  "*.x-api-key",
+  "*.x-user-sync-key",
 ];
 
 export function createLogger({
